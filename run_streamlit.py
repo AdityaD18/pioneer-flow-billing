@@ -1414,9 +1414,10 @@ with t_quotation:
 with t_history:
     st.markdown("### 📜 System History Ledger")
     
-    ledger_type = st.radio("Choose Ledger Type", ["Invoices Ledger", "Quotations Ledger"], horizontal=True, key="ledger_history_type")
+    t_hist_inv, t_hist_qtn = st.tabs(["🧾 Invoices History", "📄 Quotations History"])
     
-    if ledger_type == "Invoices Ledger":
+    # --- SUB-TAB: INVOICES HISTORY ---
+    with t_hist_inv:
         q_inv_search = st.text_input("Search Invoices (Invoice Number, Customer Name)", placeholder="e.g. INV-2026", key="inv_search_inp")
         
         if q_inv_search:
@@ -1463,27 +1464,19 @@ with t_history:
                     )
                 components.html(html_invoice, height=850, scrolling=True)
             else:
-                rows_html = ""
+                inv_display = []
                 for inv in invoices:
-                    rows_html += f"<tr><td><strong>{inv['invoice_number']}</strong></td><td>{inv['invoice_date']}</td><td>{inv['customer_name_snapshot']}</td><td>{inv['order_number']}</td><td><strong>₹{inv['grand_total']:.2f}</strong></td></tr>"
-                render_html(f"""
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Invoice No</th>
-                            <th>Billing Date</th>
-                            <th>Customer / Company</th>
-                            <th>Order Ref</th>
-                            <th>Grand Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {rows_html}
-                    </tbody>
-                </table>
-                """)
-    else:
-        # Quotations Ledger
+                    inv_display.append({
+                        "Invoice No": inv['invoice_number'],
+                        "Billing Date": inv['invoice_date'],
+                        "Customer / Company": inv['customer_name_snapshot'],
+                        "Order Ref": inv['order_number'],
+                        "Grand Total (₹)": f"₹{inv['grand_total']:.2f}"
+                    })
+                st.dataframe(pd.DataFrame(inv_display), use_container_width=True, hide_index=True)
+
+    # --- SUB-TAB: QUOTATIONS HISTORY ---
+    with t_hist_qtn:
         q_qtn_search = st.text_input("Search Quotations (Quotation Number, Customer Name)", placeholder="e.g. QTN-2026", key="qtn_search_inp")
         
         quotations = QuotationService.get_quotations(q_qtn_search.strip() if q_qtn_search else None)
@@ -1514,25 +1507,15 @@ with t_history:
                     )
                 components.html(html_qtn, height=850, scrolling=True)
             else:
-                rows_html = ""
+                qtn_display = []
                 for qtn in quotations:
-                    rows_html += f"<tr><td><strong>{qtn['quotation_number']}</strong></td><td>{qtn['created_at'][:10]}</td><td>{qtn['customer_name_snapshot']}</td><td>-</td><td><strong>₹{qtn['grand_total']:.2f}</strong></td></tr>"
-                render_html(f"""
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Quotation No</th>
-                            <th>Date</th>
-                            <th>Customer / Company</th>
-                            <th>Order Ref</th>
-                            <th>Grand Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {rows_html}
-                    </tbody>
-                </table>
-                """)
+                    qtn_display.append({
+                        "Quotation No": qtn['quotation_number'],
+                        "Date": qtn['created_at'][:10] if qtn['created_at'] else "",
+                        "Customer / Company": qtn['customer_name_snapshot'],
+                        "Grand Total (₹)": f"₹{qtn['grand_total']:.2f}"
+                    })
+                st.dataframe(pd.DataFrame(qtn_display), use_container_width=True, hide_index=True)
 
 # --- TAB: MANUAL ENTRY ---
 with t_manual:
