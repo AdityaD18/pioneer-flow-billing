@@ -1,10 +1,12 @@
 import os
 import sys
+import io
 import pandas as pd
 from datetime import datetime
 import streamlit as st
 import streamlit.components.v1 as components
 import textwrap
+from xhtml2pdf import pisa
 
 # Ensure project modules are on path
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
@@ -371,8 +373,16 @@ def generate_invoice_html(invoice_data):
         </div>
     </body>
     </html>
-    """
     return html
+
+def generate_invoice_pdf(invoice_data):
+    """Generates binary PDF content from invoice or quotation details using xhtml2pdf."""
+    html_content = generate_invoice_html(invoice_data)
+    pdf_buffer = io.BytesIO()
+    pisa_status = pisa.CreatePDF(html_content, dest=pdf_buffer)
+    if pisa_status.err:
+        raise RuntimeError("Failed to generate PDF document.")
+    return pdf_buffer.getvalue()
 
 # 4. Brand Header Layout
 st.markdown("""
@@ -1075,14 +1085,15 @@ with t_invoice:
         
         col_pr1, col_pr2 = st.columns([3, 1])
         with col_pr1:
-            st.info(f"Invoice **{invoice_info['invoice_number']}** generated successfully. You can download the printable HTML document on the right to print as a PDF.")
+            st.info(f"Invoice **{invoice_info['invoice_number']}** generated successfully. Download your official PDF print sheet below.")
         with col_pr2:
             html_content = generate_invoice_html(invoice_info)
+            pdf_bytes = generate_invoice_pdf(invoice_info)
             st.download_button(
-                label="📥 Download Printable HTML Invoice",
-                data=html_content,
-                file_name=f"invoice_{invoice_info['invoice_number']}.html",
-                mime="text/html",
+                label="📄 Download Print Sheet (PDF)",
+                data=pdf_bytes,
+                file_name=f"invoice_{invoice_info['invoice_number']}.pdf",
+                mime="application/pdf",
                 use_container_width=True
             )
             if st.button("Close Preview", use_container_width=True):
@@ -1394,14 +1405,15 @@ with t_quotation:
         
         col_q_pr1, col_q_pr2 = st.columns([3, 1])
         with col_q_pr1:
-            st.info(f"Quotation **{qtn_info['quotation_number']}** generated successfully. You can download the printable HTML document on the right to print as a PDF.")
+            st.info(f"Quotation **{qtn_info['quotation_number']}** generated successfully. Download your official PDF print sheet below.")
         with col_q_pr2:
             html_content = generate_invoice_html(qtn_info)
+            pdf_bytes = generate_invoice_pdf(qtn_info)
             st.download_button(
-                label="📥 Download Printable HTML Quotation",
-                data=html_content,
-                file_name=f"quotation_{qtn_info['quotation_number']}.html",
-                mime="text/html",
+                label="📄 Download Print Sheet (PDF)",
+                data=pdf_bytes,
+                file_name=f"quotation_{qtn_info['quotation_number']}.pdf",
+                mime="application/pdf",
                 use_container_width=True
             )
             if st.button("Close Preview", use_container_width=True, key="close_qtn_preview_btn"):
@@ -1454,11 +1466,12 @@ with t_history:
                     st.markdown(f"#### 📄 Invoice Details: {invoice_full['invoice_number']}")
                 with col_print2:
                     html_invoice = generate_invoice_html(invoice_full)
+                    pdf_invoice = generate_invoice_pdf(invoice_full)
                     st.download_button(
-                        label="📥 Download Print Sheet (HTML)",
-                        data=html_invoice,
-                        file_name=f"invoice_{invoice_full['invoice_number']}.html",
-                        mime="text/html",
+                        label="📄 Download Print Sheet (PDF)",
+                        data=pdf_invoice,
+                        file_name=f"invoice_{invoice_full['invoice_number']}.pdf",
+                        mime="application/pdf",
                         use_container_width=True,
                         key="dl_inv_hist_btn"
                     )
@@ -1497,11 +1510,12 @@ with t_history:
                     st.markdown(f"#### 📄 Quotation Details: {qtn_full['quotation_number']}")
                 with col_print2:
                     html_qtn = generate_invoice_html(qtn_full)
+                    pdf_qtn = generate_invoice_pdf(qtn_full)
                     st.download_button(
-                        label="📥 Download Print Sheet (HTML)",
-                        data=html_qtn,
-                        file_name=f"quotation_{qtn_full['quotation_number']}.html",
-                        mime="text/html",
+                        label="📄 Download Print Sheet (PDF)",
+                        data=pdf_qtn,
+                        file_name=f"quotation_{qtn_full['quotation_number']}.pdf",
+                        mime="application/pdf",
                         use_container_width=True,
                         key="dl_qtn_hist_btn"
                     )
