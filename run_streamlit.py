@@ -373,6 +373,7 @@ def generate_invoice_html(invoice_data):
         </div>
     </body>
     </html>
+    """
     return html
 
 def generate_invoice_pdf(invoice_data):
@@ -1103,6 +1104,87 @@ with t_invoice:
         # Render the raw HTML template in Streamlit
         components.html(html_content, height=850, scrolling=True)
 
+if hasattr(st, "dialog"):
+    @st.dialog("Verify Quotation Product Specifications", width="large")
+    def show_quotation_verification_modal(cust_payload, items_input, qtn_date_str):
+        st.markdown("### 🔍 Product Sheet Properties & Verification")
+        st.write(f"**Customer:** `{cust_payload.get('name')}` | **Date:** `{qtn_date_str}`")
+        st.info("Review attached product specifications, stock levels, and pricing before confirming.")
+        
+        calc = OrderService.calculate_order(cust_payload, items_input)
+        
+        for idx, item in enumerate(items_input):
+            part_num = item['part_number']
+            p_info = query_db(
+                """SELECT p.*, i.current_stock, i.purc_orders_pending, i.sale_orders_due, 
+                          i.nett_available, i.reorder_level, i.short_fall, i.min_reorder_qty, 
+                          i.order_to_be_placed 
+                   FROM PRODUCTS p
+                   LEFT JOIN INVENTORY i ON p.id = i.product_id
+                   WHERE p.part_number = ?""",
+                (part_num,),
+                one=True
+            )
+            
+            st.markdown('<div class="panel" style="margin-bottom: 12px; border-left: 4px solid #38bdf8;">', unsafe_allow_html=True)
+            col_v1, col_v2 = st.columns([1, 3])
+            with col_v1:
+                make_name = p_info['make'] if p_info and p_info['make'] else 'WAGO'
+                series_name = p_info['series'] if p_info and p_info['series'] else '-'
+                st.markdown(f"""
+                <div style="background:#1e293b; border:1px solid #334155; border-radius:8px; padding:12px; text-align:center;">
+                    <div style="font-size:28px; margin-bottom:4px;">📦</div>
+                    <strong style="color:#38bdf8; font-size:15px;">{part_num}</strong><br>
+                    <span style="font-size:11px; color:#94a3b8;">Make: {make_name}</span><br>
+                    <span style="font-size:11px; color:#94a3b8;">Series: {series_name}</span>
+                </div>
+                """, unsafe_allow_html=True)
+            with col_v2:
+                stock_val = p_info['current_stock'] if p_info and p_info['current_stock'] is not None else 0
+                purc_val = p_info['purc_orders_pending'] if p_info and p_info['purc_orders_pending'] is not None else 0
+                sale_val = p_info['sale_orders_due'] if p_info and p_info['sale_orders_due'] is not None else 0
+                nett_val = p_info['nett_available'] if p_info and p_info['nett_available'] is not None else 0
+                reorder_val = p_info['reorder_level'] if p_info and p_info['reorder_level'] is not None else 0
+                shortfall_val = p_info['short_fall'] if p_info and p_info['short_fall'] is not None else 0
+                
+                st.markdown(f"**Item Code:** `{part_num}` | **Quantity:** `{int(item['quantity'])} pcs` | **Price/100:** `₹{item['unit_price_100']:.2f}`")
+                st.markdown(f"""
+                <div style="font-size:12px; background:#0f172a; padding:8px 12px; border-radius:6px; margin-top:6px;">
+                    <strong>Sheet Properties & Stock Metrics:</strong><br>
+                    Closing Stock: <strong style="color:#4ade80;">{int(stock_val)} pcs</strong> | 
+                    Purc Pending: {int(purc_val)} | 
+                    Sale Due: {int(sale_val)} | 
+                    Nett Available: <strong>{int(nett_val)}</strong> | 
+                    Reorder Level: {int(reorder_val)} | 
+                    Shortfall: <span style="color:#f87171;">{int(shortfall_val)}</span>
+                </div>
+                """, unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+        st.markdown(f"### **Grand Total:** ₹{calc['grand_total']:.2f}")
+        
+        col_m_btn1, col_m_btn2 = st.columns([1, 1])
+        with col_m_btn1:
+            if st.button("✅ Confirm & Generate Quotation", type="primary", use_container_width=True, key="confirm_qtn_modal_btn"):
+                try:
+                    quotation_id = QuotationService.generate_quotation(
+                        customer_input=cust_payload,
+                        items_input=items_input,
+                        quotation_date=qtn_date_str
+                    )
+                    qtn_data = QuotationService.get_quotation_by_id(quotation_id)
+                    st.session_state.last_quotation_generated = qtn_data
+                    st.session_state.quotation_items = []
+                    st.session_state.show_qtn_verify_dialog = False
+                    trigger_toast(f"Quotation {qtn_data['quotation_number']} verified and generated!", icon="📄")
+                    st.rerun()
+                except Exception as ex:
+                    st.error(f"Failed to generate quotation: {str(ex)}")
+        with col_m_btn2:
+            if st.button("❌ Cancel / Edit Draft", use_container_width=True, key="cancel_qtn_modal_btn"):
+                st.session_state.show_qtn_verify_dialog = False
+                st.rerun()
+
 # --- TAB: NEW QUOTATION ---
 with t_quotation:
     st.markdown("### Interactive Proforma Quotation Generator")
@@ -1287,6 +1369,9 @@ with t_quotation:
         
         qtn_date = st.date_input("Quotation Date", datetime.now(), key="qtn_date")
         
+        if st.session_state.get('show_qtn_verify_dialog'):
+            show_quotation_verification_modal(cust_payload, st.session_state.quotation_items, qtn_date.strftime('%Y-%m-%d'))
+            
         st.subheader("3. Live totals & actions")
         if len(st.session_state.quotation_items) == 0:
             render_html("""
@@ -1318,23 +1403,12 @@ with t_quotation:
             if calc['has_warnings']:
                 st.warning("⚠️ Some items in this quotation draft exceed available physical stock.")
                 
-            if st.button("Generate Quotation", type="primary", use_container_width=True, key="generate_qtn_btn"):
+            if st.button("Preview & Verify Quotation Properties", type="primary", use_container_width=True, key="generate_qtn_btn"):
                 if not inv_billing_name.strip():
                     st.error("Customer name is required.")
                 else:
-                    try:
-                        quotation_id = QuotationService.generate_quotation(
-                            customer_input=cust_payload,
-                            items_input=st.session_state.quotation_items,
-                            quotation_date=qtn_date.strftime('%Y-%m-%d')
-                        )
-                        qtn_data = QuotationService.get_quotation_by_id(quotation_id)
-                        st.session_state.last_quotation_generated = qtn_data
-                        st.session_state.quotation_items = []
-                        trigger_toast(f"Quotation {qtn_data['quotation_number']} generated!", icon="📄")
-                        st.rerun()
-                    except Exception as ex:
-                        st.error(f"Failed to generate quotation: {str(ex)}")
+                    st.session_state.show_qtn_verify_dialog = True
+                    st.rerun()
 
     # Display items table below configuration
     st.subheader("📋 Quotation Line Items Grid")
