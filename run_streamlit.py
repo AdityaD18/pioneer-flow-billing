@@ -417,45 +417,7 @@ with t_dash:
     with col4:
         draw_metric_card("Last Inventory Sync", last_inventory, "Upload timeline sync date", "fa-solid fa-clock")
 
-    st.subheader("Data Sync Activity Logs")
-    logs = query_db("SELECT * FROM IMPORT_LOG ORDER BY imported_at DESC LIMIT 5")
-    
-    if len(logs) == 0:
-        st.info("No import activity logs found in the database. Head to the 'Import Sheets' tab to load Excel files.")
-    else:
-        rows_html = ""
-        for log in logs:
-            status_cls = "badge-green" if log['status'] == 'success' else ("badge-amber" if log['status'] == 'partial_success' else "badge-red")
-            status_lbl = "Success" if log['status'] == 'success' else ("Partial" if log['status'] == 'partial_success' else "Failed")
-            formatted_date = datetime.fromisoformat(log['imported_at']).strftime('%Y-%m-%d %H:%M')
-            rows_html += f"""
-            <tr>
-                <td>{formatted_date}</td>
-                <td><span class="badge badge-blue">{log['import_type'].upper()}</span></td>
-                <td>{log['filename']}</td>
-                <td>{log['total_records']}</td>
-                <td>{log['successful_records']}</td>
-                <td><span class="badge {status_cls}">{status_lbl}</span></td>
-            </tr>
-            """
-        
-        st.markdown(f"""
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Sync Time</th>
-                    <th>Type</th>
-                    <th>Source File</th>
-                    <th>Total Records</th>
-                    <th>Success Entries</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {rows_html}
-            </tbody>
-        </table>
-        """, unsafe_allow_html=True)
+
 
 # --- TAB: IMPORTS ---
 with t_imports:
@@ -536,45 +498,7 @@ with t_imports:
             
     st.markdown('</div>', unsafe_allow_html=True)
 
-    st.subheader("Full Upload Sync History Log")
-    all_logs = query_db("SELECT * FROM IMPORT_LOG ORDER BY imported_at DESC")
-    if len(all_logs) == 0:
-        st.info("No activity found.")
-    else:
-        log_rows = ""
-        for log in all_logs:
-            status_cls = "badge-green" if log['status'] == 'success' else ("badge-amber" if log['status'] == 'partial_success' else "badge-red")
-            status_lbl = "Success" if log['status'] == 'success' else ("Partial" if log['status'] == 'partial_success' else "Failed")
-            formatted_date = datetime.fromisoformat(log['imported_at']).strftime('%Y-%m-%d %H:%M:%S')
-            log_rows += f"""
-            <tr>
-                <td>{formatted_date}</td>
-                <td><span class="badge badge-blue">{log['import_type'].upper()}</span></td>
-                <td>{log['filename']}</td>
-                <td>{log['total_records']}</td>
-                <td>{log['successful_records']}</td>
-                <td>{log['failed_records']}</td>
-                <td><span class="badge {status_cls}">{status_lbl}</span></td>
-            </tr>
-            """
-        st.markdown(f"""
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Date & Time</th>
-                    <th>Type</th>
-                    <th>File Name</th>
-                    <th>Processed</th>
-                    <th>Successful</th>
-                    <th>Failed</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {log_rows}
-            </tbody>
-        </table>
-        """, unsafe_allow_html=True)
+
 
 # --- TAB: PRODUCT CATALOG ---
 with t_catalog:
