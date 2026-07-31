@@ -389,9 +389,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 5. Core Navigation Tabs
-t_dash, t_imports, t_catalog, t_inventory, t_customers, t_invoice, t_quotation, t_history, t_manual, t_settings = st.tabs([
+t_dash, t_catalog, t_inventory, t_customers, t_invoice, t_quotation, t_history, t_manual, t_settings = st.tabs([
     "📊 Dashboard", 
-    "📁 Import Sheets", 
     "📦 Product Catalog", 
     "🔍 Available Inventory",
     "👥 Customers", 
@@ -490,53 +489,6 @@ with t_dash:
     with col4:
         draw_metric_card("Last Inventory Sync", last_inventory, "Upload timeline sync date", "fa-solid fa-clock")
 
-
-
-# --- TAB: IMPORTS ---
-with t_imports:
-    st.markdown("### Upload Annual Price List")
-    
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.subheader("Import Price List Sheet")
-    st.write("Upload the Excel workbook (.xlsx, .xls) containing the pricing list sheet. Note: Warehouse stock levels are auto-synchronized from your cloud Excel connection.")
-    
-    price_file = st.file_uploader("Select Price List Excel Workbook", type=["xlsx", "xls"], key="price_file")
-    
-    cost_sheet = st.text_input("Price List Sheet Name", "PRICE LIST", key="cost_sheet")
-        
-    if st.button("Run Price List Import", use_container_width=True, type="primary"):
-        if price_file is None:
-            st.error("Please upload an Excel workbook first.")
-        else:
-            # Save temp file
-            temp_path = os.path.join("uploads", price_file.name)
-            os.makedirs("uploads", exist_ok=True)
-            with open(temp_path, "wb") as f:
-                f.write(price_file.getvalue())
-            
-            # Progress tracking
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            
-            # Process Costs
-            status_text.text("Importing product pricing lists...")
-            progress_bar.progress(50)
-            cost_res = ImportService.import_costs(temp_path, sheet_name=cost_sheet, filename=price_file.name)
-            
-            progress_bar.progress(100)
-            status_text.text("Import finished.")
-            
-            # clean up temp file
-            try: os.remove(temp_path)
-            except: pass
-            
-            if cost_res['status'] == 'failed':
-                st.error(f"Price list upload failed: {', '.join(cost_res['errors'])}")
-            else:
-                trigger_toast(f"Price list sync successful! Loaded {cost_res['successful_records']} items.", icon="✅")
-                st.rerun()
-            
-    st.markdown('</div>', unsafe_allow_html=True)
 
 
 
@@ -1720,3 +1672,32 @@ with t_settings:
                         st.rerun()
                     else:
                         st.error(f"Sync failed: {', '.join(res['errors'])}")
+                        
+    st.subheader("3. Import Price List")
+    st.write("Upload the Excel workbook (.xlsx, .xls) containing the pricing list sheet to update system costs.")
+    
+    price_file = st.file_uploader("Select Price List Excel Workbook", type=["xlsx", "xls"], key="price_file")
+    cost_sheet = st.text_input("Price List Sheet Name", "PRICE LIST", key="cost_sheet")
+    
+    if st.button("Run Price List Import", use_container_width=True, type="primary", key="settings_import_price_btn"):
+        if price_file is None:
+            st.error("Please upload an Excel workbook first.")
+        else:
+            # Save temp file
+            temp_path = os.path.join("uploads", price_file.name)
+            os.makedirs("uploads", exist_ok=True)
+            with open(temp_path, "wb") as f:
+                f.write(price_file.getvalue())
+            
+            with st.spinner("Importing product pricing lists..."):
+                cost_res = ImportService.import_costs(temp_path, sheet_name=cost_sheet, filename=price_file.name)
+            
+            # clean up temp file
+            try: os.remove(temp_path)
+            except: pass
+            
+            if cost_res['status'] == 'failed':
+                st.error(f"Price list upload failed: {', '.join(cost_res['errors'])}")
+            else:
+                trigger_toast(f"Price list sync successful! Loaded {cost_res['successful_records']} items.", icon="✅")
+                st.rerun()
