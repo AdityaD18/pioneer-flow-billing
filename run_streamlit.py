@@ -4,6 +4,7 @@ import pandas as pd
 from datetime import datetime
 import streamlit as st
 import streamlit.components.v1 as components
+import textwrap
 
 # Ensure project modules are on path
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
@@ -183,15 +184,18 @@ button[data-baseweb="tab"][aria-selected="true"] {
 st.markdown(CSS_STYLE, unsafe_allow_html=True)
 
 # 3. Helpers for layout components
+def render_html(html_content):
+    st.markdown(textwrap.dedent(html_content), unsafe_allow_html=True)
+
 def draw_metric_card(label, value, footer_text=None, icon_class="fa-solid fa-chart-line"):
     footer_html = f'<div class="metric-footer"><i class="{icon_class}"></i> {footer_text}</div>' if footer_text else ""
-    st.markdown(f"""
+    render_html(f"""
     <div class="metric-card">
         <div class="metric-label">{label}</div>
         <div class="metric-value">{value}</div>
         {footer_html}
     </div>
-    """, unsafe_allow_html=True)
+    """)
 
 def generate_invoice_html(invoice_data):
     """Generates the clean printable tax invoice HTML with direct styles embedded."""
@@ -610,7 +614,7 @@ with t_inventory:
             </tr>
             """
             
-        st.markdown(f"""
+        render_html(f"""
         <table class="data-table">
             <thead>
                 <tr>
@@ -627,7 +631,7 @@ with t_inventory:
                 {inv_rows}
             </tbody>
         </table>
-        """, unsafe_allow_html=True)
+        """)
         st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB: CUSTOMERS ---
@@ -710,7 +714,7 @@ with t_customers:
                         <td><strong>₹{inv['grand_total']:.2f}</strong></td>
                     </tr>
                     """
-                st.markdown(f"""
+                render_html(f"""
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -724,7 +728,7 @@ with t_customers:
                         {inv_rows}
                     </tbody>
                 </table>
-                """, unsafe_allow_html=True)
+                """)
             st.markdown("<br><hr><br>", unsafe_allow_html=True)
             
         st.markdown("### Customer Registry")
@@ -743,7 +747,7 @@ with t_customers:
                     <td>{terms_val}</td>
                 </tr>
                 """
-            st.markdown(f"""
+            render_html(f"""
             <table class="data-table">
                 <thead>
                     <tr>
@@ -757,7 +761,7 @@ with t_customers:
                     {cust_rows}
                 </tbody>
             </table>
-            """, unsafe_allow_html=True)
+            """)
 
 # --- TAB: NEW INVOICE ---
 with t_invoice:
@@ -893,7 +897,7 @@ with t_invoice:
         
         st.subheader("3. Live totals & actions")
         if len(st.session_state.invoice_items) == 0:
-            st.markdown("""
+            render_html("""
             <div class="metric-card">
                 <div class="metric-label">Subtotal:</div>
                 <div class="metric-value">₹0.00</div>
@@ -902,12 +906,12 @@ with t_invoice:
                 <div class="metric-label">Grand Total (Incl Tax):</div>
                 <div class="metric-value" style="color: var(--cyan);">₹0.00</div>
             </div>
-            """, unsafe_allow_html=True)
+            """)
             st.info("Assemble line items on the left to see calculations.")
         else:
             calc = OrderService.calculate_order(cust_payload, st.session_state.invoice_items)
             
-            st.markdown(f"""
+            render_html(f"""
             <div class="metric-card">
                 <div class="metric-label">Subtotal:</div>
                 <div class="metric-value">₹{calc['subtotal']:.2f}</div>
@@ -917,7 +921,7 @@ with t_invoice:
                 <div class="metric-label">Grand Total (Excl. Shipping):</div>
                 <div class="metric-value" style="color: var(--cyan);">₹{calc['grand_total']:.2f}</div>
             </div>
-            """, unsafe_allow_html=True)
+            """)
             
             # Stock warnings
             if calc['has_warnings']:
@@ -1106,7 +1110,7 @@ with t_history:
                     <td><strong>₹{inv['grand_total']:.2f}</strong></td>
                 </tr>
                 """
-            st.markdown(f"""
+            render_html(f"""
             <table class="data-table">
                 <thead>
                     <tr>
@@ -1121,7 +1125,7 @@ with t_history:
                     {rows_html}
                 </tbody>
             </table>
-            """, unsafe_allow_html=True)
+            """)
 
 # --- TAB: MANUAL ENTRY ---
 with t_manual:
