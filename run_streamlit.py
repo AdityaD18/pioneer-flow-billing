@@ -832,17 +832,41 @@ with t_invoice:
         # Select active profile
         selected_cust_name = st.selectbox("Search / Select Active Billing Profile", cust_names, key="inv_cust_select")
         
+        # Initialize sync state if missing
+        if "prev_selected_cust" not in st.session_state:
+            st.session_state.prev_selected_cust = "- Create New Inline -"
+            st.session_state.inv_billing_name = ""
+            st.session_state.inv_billing_discount = 0.0
+            st.session_state.inv_billing_gst = ""
+            st.session_state.inv_billing_terms = ""
+            
+        # Detect selection change and update widget state values
+        if selected_cust_name != st.session_state.prev_selected_cust:
+            if selected_cust_name == "- Create New Inline -":
+                st.session_state.inv_billing_name = ""
+                st.session_state.inv_billing_discount = 0.0
+                st.session_state.inv_billing_gst = ""
+                st.session_state.inv_billing_terms = ""
+            else:
+                cust_profile = CustomerService.get_customer_by_name(selected_cust_name)
+                if cust_profile:
+                    st.session_state.inv_billing_name = cust_profile['name']
+                    st.session_state.inv_billing_discount = cust_profile['discount_percentage']
+                    st.session_state.inv_billing_gst = cust_profile['gst_number'] or ""
+                    st.session_state.inv_billing_terms = cust_profile['payment_terms'] or ""
+            st.session_state.prev_selected_cust = selected_cust_name
+            
         cust_profile = None
         if selected_cust_name != "- Create New Inline -":
             cust_profile = CustomerService.get_customer_by_name(selected_cust_name)
             
         col_c_in1, col_c_in2 = st.columns(2)
         with col_c_in1:
-            billing_name = st.text_input("Billing Name *", value=cust_profile['name'] if cust_profile else "", disabled=(cust_profile is not None), key="inv_billing_name")
-            billing_discount = st.number_input("Discount Profile (%)", min_value=0.0, max_value=100.0, step=0.01, value=cust_profile['discount_percentage'] if cust_profile else 0.0, key="inv_billing_discount")
+            billing_name = st.text_input("Billing Name *", key="inv_billing_name", disabled=(selected_cust_name != "- Create New Inline -"))
+            billing_discount = st.number_input("Discount Profile (%)", min_value=0.0, max_value=100.0, step=0.01, key="inv_billing_discount")
         with col_c_in2:
-            billing_gst = st.text_input("GSTIN Snapshot", value=(cust_profile['gst_number'] or "") if cust_profile else "", key="inv_billing_gst")
-            billing_terms = st.text_input("Payment Terms Snapshot", value=(cust_profile['payment_terms'] or "") if cust_profile else "", placeholder="e.g. Net 30 Days", key="inv_billing_terms")
+            billing_gst = st.text_input("GSTIN Snapshot", key="inv_billing_gst")
+            billing_terms = st.text_input("Payment Terms Snapshot", placeholder="e.g. Net 30 Days", key="inv_billing_terms")
             
         inv_date = st.date_input("Billing Date", datetime.now(), key="inv_date_input")
         
@@ -1085,7 +1109,7 @@ with t_manual:
         col_m1, col_m2 = st.columns(2)
         with col_m1:
             m_part = st.text_input("Part Number / Item Code *", "", placeholder="e.g. 209-120", key="man_prod_part")
-            m_make = st.text_input("Make / Manufacturer *", "WAGO", key="man_prod_make")
+            m_make = st.text_input("Make / Manufacturer *", "", placeholder="WAGO", key="man_prod_make")
             m_name = st.text_input("Product Name / Description", "", key="man_prod_name")
         with col_m2:
             m_packing = st.number_input("Packing Quantity (PCS)", min_value=1, value=1, key="man_prod_pack")
@@ -1093,7 +1117,8 @@ with t_manual:
             m_price = st.number_input("Cost Rate (INR per 100 pcs)", min_value=0.0, step=0.01, value=0.0, key="man_prod_price")
             
         if st.button("Save New Product Catalog Entry", type="primary", use_container_width=True, key="man_prod_save_btn"):
-            if not m_part.strip() or not m_make.strip():
+            make_val = m_make.strip() or "WAGO"
+            if not m_part.strip() or not make_val:
                 st.error("Part Number and Make are mandatory fields.")
             else:
                 conn = get_db_connection()
@@ -1112,7 +1137,7 @@ with t_manual:
                         series = m_part.split('-')[0] if '-' in m_part else None
                         cur.execute(
                             "INSERT INTO PRODUCTS (part_number, part_name, series, make, packing_quantity) VALUES (?, ?, ?, ?, ?)",
-                            (m_part.strip(), m_name.strip() or m_part.strip(), series, m_make.strip(), m_packing)
+                            (m_part.strip(), m_name.strip() or m_part.strip(), series, make_val, m_packing)
                         )
                         product_id = cur.lastrowid
                         
