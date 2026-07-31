@@ -20,8 +20,8 @@ from app.services.quotation_service import QuotationService
 
 # 1. Page Configuration
 st.set_page_config(
-    page_title="PIONEER FLOW - Billing Automation",
-    page_icon="⚙️",
+    page_title="Pioneer Flow — Billing Automation",
+    page_icon="⚡",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -29,158 +29,392 @@ st.set_page_config(
 # Initialize database
 init_db()
 
-# 2. Inject Premium Custom Styling (Glassmorphism Dark Theme + Layout optimizations)
-IS_DARK = True # Force dark aesthetic for that premium WOW factor
-
+# 2. Inject Premium Custom Styling — Full Dark Glassmorphism Theme
 CSS_STYLE = """
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style>
 :root {
-    --bg: #09090b;
-    --bg-subtle: #0f0f13;
-    --card: #121217;
-    --card-hover: #171720;
-    --border: rgba(255,255,255,0.08);
-    --border-subtle: rgba(255,255,255,0.04);
-    --text: #fafafa;
-    --text-muted: #71717a;
-    --text-dim: #52525b;
-    --accent: #7c3aed;
-    --accent-hover: #6d28d9;
-    --cyan: #06b6d4;
-    --green: #10b981;
-    --green-muted: rgba(16,185,129,0.12);
-    --red: #ef4444;
-    --red-muted: rgba(239,68,68,0.12);
-    --amber: #f59e0b;
-    --amber-muted: rgba(245,158,11,0.12);
-    --radius: 10px;
+    --bg:            #07070a;
+    --bg-subtle:     #0d0d12;
+    --bg-card:       #111118;
+    --bg-card-hover: #16161f;
+    --border:        rgba(255,255,255,0.07);
+    --border-bright: rgba(255,255,255,0.13);
+    --border-subtle: rgba(255,255,255,0.03);
+    --text:          #f0f0f5;
+    --text-muted:    #6b6b80;
+    --text-dim:      #44445a;
+    --accent:        #7c3aed;
+    --accent2:       #a855f7;
+    --accent-glow:   rgba(124,58,237,0.25);
+    --cyan:          #22d3ee;
+    --cyan-muted:    rgba(34,211,238,0.12);
+    --green:         #10b981;
+    --green-muted:   rgba(16,185,129,0.12);
+    --green-glow:    rgba(16,185,129,0.2);
+    --red:           #f43f5e;
+    --red-muted:     rgba(244,63,94,0.12);
+    --red-glow:      rgba(244,63,94,0.2);
+    --amber:         #f59e0b;
+    --amber-muted:   rgba(245,158,11,0.12);
+    --radius:        12px;
+    --radius-sm:     8px;
+    --shadow:        0 4px 24px rgba(0,0,0,0.5);
+    --shadow-lg:     0 8px 40px rgba(0,0,0,0.6);
 }
 
-/* Hide Streamlit components */
+/* ── Hide Streamlit chrome ─────────────────────────────── */
 header[data-testid="stHeader"], footer, [data-testid="stToolbar"],
 [data-testid="stDecoration"], [data-testid="stStatusWidget"], .stDeployButton,
-div[data-testid="stSidebarCollapsedControl"] {
-    display: none !important;
-}
+div[data-testid="stSidebarCollapsedControl"] { display: none !important; }
 
-html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"], .main, .block-container, section[data-testid="stMain"] {
+/* ── Global typography & background ───────────────────── */
+html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"],
+.main, .block-container, section[data-testid="stMain"] {
     background-color: var(--bg) !important;
     color: var(--text) !important;
-    font-family: 'Outfit', sans-serif !important;
+    font-family: 'Inter', sans-serif !important;
 }
-
 .block-container {
-    padding: 1.5rem 2rem 2rem !important;
-    max-width: 1400px !important;
+    padding: 0 2rem 2.5rem !important;
+    max-width: 1440px !important;
 }
 
-/* Metric Cards style */
-.metric-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1.25rem 1.4rem;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    margin-bottom: 1rem;
+/* ── Brand Header ──────────────────────────────────────── */
+.pf-header {
+    position: relative;
+    padding: 1.5rem 0 1.2rem;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
 }
-.metric-label { font-size: 0.8rem; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
-.metric-value { font-size: 1.85rem; font-weight: 700; color: var(--text); margin-top: 0.25rem; }
-.metric-footer { font-size: 0.72rem; color: var(--cyan); margin-top: 0.5rem; display: flex; align-items: center; gap: 4px; }
-
-/* Custom HTML tables for timelines and details */
-.data-table {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    font-size: 0.825rem;
-    margin-top: 0.5rem;
+.pf-header::before {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), var(--cyan), transparent);
+    opacity: 0.6;
 }
-.data-table th {
-    text-align: left;
-    padding: 0.65rem 0.85rem;
-    color: var(--text-muted);
-    font-weight: 600;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    border-bottom: 1px solid var(--border);
-    background-color: rgba(255,255,255,0.02);
-}
-.data-table td {
-    padding: 0.7rem 0.85rem;
-    color: var(--text);
-    border-bottom: 1px solid var(--border-subtle);
-}
-.data-table tbody tr:hover {
-    background-color: rgba(255,255,255,0.02);
-}
-
-/* Badges */
-.badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    text-transform: uppercase;
-}
-.badge-green { color: var(--green); background: var(--green-muted); }
-.badge-red { color: var(--red); background: var(--red-muted); }
-.badge-amber { color: var(--amber); background: var(--amber-muted); }
-.badge-blue { color: var(--cyan); background: rgba(6,182,212,0.12); }
-
-/* Header Brand container */
-.brand-container {
+.pf-header-inner {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 1rem;
-    margin-bottom: 1.5rem;
 }
-.brand-title {
-    font-size: 1.6rem;
-    font-weight: 800;
-    letter-spacing: 1px;
+.pf-logo-wrap { display: flex; align-items: center; gap: 14px; }
+.pf-logo-icon {
+    width: 44px; height: 44px;
+    background: linear-gradient(135deg, var(--accent), var(--cyan));
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 0 20px var(--accent-glow);
 }
-.brand-title span {
-    color: var(--accent);
+.pf-wordmark {
+    font-size: 1.55rem; font-weight: 900; letter-spacing: 0.5px;
+    background: linear-gradient(90deg, #e0e0ff, #a78bfa, #22d3ee);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
-.brand-subtitle {
-    font-size: 0.8rem;
+.pf-tagline { font-size: 0.72rem; color: var(--text-muted); margin-top: 1px; letter-spacing: 0.3px; }
+.pf-status-cluster { display: flex; align-items: center; gap: 10px; }
+.pf-pill {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 99px;
+    font-size: 0.72rem; font-weight: 600;
+    border: 1px solid var(--border-bright);
+    background: var(--bg-card);
     color: var(--text-muted);
-    margin-top: 2px;
+}
+.pf-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    animation: pulse-dot 2s ease-in-out infinite;
+}
+.pf-dot-green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.pf-dot-blue  { background: var(--cyan);  box-shadow: 0 0 6px var(--cyan); }
+@keyframes pulse-dot {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.5; transform: scale(0.85); }
 }
 
-/* Tabs overriding styling */
+/* ── Navigation Tabs ───────────────────────────────────── */
+[data-baseweb="tab-list"] {
+    gap: 4px !important;
+    background: var(--bg-subtle) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 14px !important;
+    padding: 5px !important;
+    margin-bottom: 1.75rem !important;
+}
 button[data-baseweb="tab"] {
     background: transparent !important;
     color: var(--text-muted) !important;
-    font-size: 0.875rem !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.82rem !important;
     font-weight: 600 !important;
-    padding: 0.55rem 1.25rem !important;
+    padding: 0.5rem 1.1rem !important;
     border: 1px solid transparent !important;
-    border-radius: 8px !important;
-    transition: all 0.3s ease;
+    border-radius: 10px !important;
+    transition: all 0.25s ease !important;
+    letter-spacing: 0.01em !important;
 }
 button[data-baseweb="tab"]:hover {
     color: var(--text) !important;
+    background: rgba(255,255,255,0.04) !important;
 }
 button[data-baseweb="tab"][aria-selected="true"] {
+    color: #fff !important;
+    background: linear-gradient(135deg, var(--accent), #6366f1) !important;
+    border-color: transparent !important;
+    box-shadow: 0 2px 12px var(--accent-glow) !important;
+}
+[data-baseweb="tab-highlight"], [data-baseweb="tab-border"] { display: none !important; }
+
+/* ── Metric Cards ──────────────────────────────────────── */
+.mc {
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.2rem 1.4rem 1rem;
+    box-shadow: var(--shadow);
+    margin-bottom: 1rem;
+    overflow: hidden;
+    transition: border-color 0.25s, box-shadow 0.25s;
+}
+.mc:hover { border-color: var(--border-bright); box-shadow: var(--shadow-lg); }
+.mc::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    border-radius: 3px 0 0 3px;
+}
+.mc-purple::before  { background: linear-gradient(180deg, var(--accent), var(--accent2)); }
+.mc-cyan::before    { background: linear-gradient(180deg, var(--cyan), #0ea5e9); }
+.mc-green::before   { background: linear-gradient(180deg, var(--green), #34d399); }
+.mc-amber::before   { background: linear-gradient(180deg, var(--amber), #fbbf24); }
+.mc-red::before     { background: linear-gradient(180deg, var(--red), #fb7185); }
+.mc-icon {
+    position: absolute; right: 1.2rem; top: 1.1rem;
+    font-size: 1.5rem; opacity: 0.12;
+}
+.mc-label {
+    font-size: 0.7rem; font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin-bottom: 0.35rem;
+}
+.mc-value {
+    font-size: 1.8rem; font-weight: 800;
+    color: var(--text); line-height: 1;
+    margin-bottom: 0.5rem;
+}
+.mc-footer {
+    font-size: 0.7rem; color: var(--text-muted);
+    display: flex; align-items: center; gap: 5px;
+    border-top: 1px solid var(--border-subtle);
+    padding-top: 0.5rem; margin-top: 0.25rem;
+}
+.mc-footer i { color: var(--cyan); }
+
+/* ── Step Indicator ────────────────────────────────────── */
+.step-bar {
+    display: flex; align-items: center;
+    gap: 0; margin-bottom: 1.5rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    overflow: hidden;
+}
+.step-item {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 0.78rem; font-weight: 600;
+    color: var(--text-muted);
+    flex: 1;
+}
+.step-item.active { color: var(--text); }
+.step-item.done   { color: var(--green); }
+.step-num {
+    width: 24px; height: 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.72rem; font-weight: 700;
+    background: var(--bg-subtle); border: 1px solid var(--border);
+    color: var(--text-muted); flex-shrink: 0;
+}
+.step-item.active .step-num {
+    background: linear-gradient(135deg, var(--accent), #6366f1);
+    border-color: transparent; color: #fff;
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+.step-item.done .step-num {
+    background: var(--green-muted); border-color: var(--green); color: var(--green);
+}
+.step-sep { color: var(--text-dim); margin: 0 6px; font-size: 0.7rem; flex-shrink: 0; }
+
+/* ── Section Headings ──────────────────────────────────── */
+.section-head {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 1.1rem; font-weight: 700;
+    color: var(--text); margin-bottom: 1rem;
+}
+.section-head i { color: var(--accent); font-size: 1rem; }
+.section-head .sub { font-size: 0.78rem; font-weight: 400; color: var(--text-muted); margin-left: 4px; }
+
+/* ── Data Tables ───────────────────────────────────────── */
+.data-table {
+    width: 100%;
+    border-collapse: separate; border-spacing: 0;
+    font-size: 0.82rem;
+}
+.data-table th {
+    text-align: left;
+    padding: 0.6rem 0.9rem;
+    color: var(--text-muted);
+    font-weight: 600; font-size: 0.72rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+}
+.data-table td {
+    padding: 0.65rem 0.9rem;
+    color: var(--text);
+    border-bottom: 1px solid var(--border-subtle);
+}
+.data-table tbody tr:hover { background: rgba(255,255,255,0.025); }
+
+/* ── Badges ────────────────────────────────────────────── */
+.badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 9px; border-radius: 99px;
+    font-size: 0.68rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.04em;
+}
+.badge-green { color: var(--green); background: var(--green-muted); border: 1px solid rgba(16,185,129,0.25); }
+.badge-red   { color: var(--red);   background: var(--red-muted);   border: 1px solid rgba(244,63,94,0.25); }
+.badge-amber { color: var(--amber); background: var(--amber-muted); border: 1px solid rgba(245,158,11,0.25); }
+.badge-blue  { color: var(--cyan);  background: var(--cyan-muted);  border: 1px solid rgba(34,211,238,0.25); }
+.badge-purple{ color: var(--accent2); background: var(--accent-glow); border: 1px solid rgba(168,85,247,0.3); }
+
+/* ── Info / Warning Panels ─────────────────────────────── */
+.info-panel {
+    background: var(--cyan-muted);
+    border: 1px solid rgba(34,211,238,0.2);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 1rem;
+    font-size: 0.82rem; color: var(--text);
+    margin: 0.75rem 0;
+}
+.warn-panel {
+    background: var(--amber-muted);
+    border: 1px solid rgba(245,158,11,0.25);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 1rem;
+    font-size: 0.82rem; color: var(--text);
+    margin: 0.75rem 0;
+}
+
+/* ── Settings section panels ───────────────────────────── */
+.setting-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+}
+.setting-section-title {
+    font-size: 0.78rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--text-muted); margin-bottom: 0.85rem;
+    display: flex; align-items: center; gap: 8px;
+}
+.setting-section-title i { color: var(--accent); }
+
+/* ── Streamlit native element overrides ────────────────── */
+[data-testid="stTextInput"] input,
+[data-testid="stNumberInput"] input,
+[data-testid="stDateInput"] input {
+    background: #0f0f16 !important;
+    border: 1px solid var(--border-bright) !important;
+    border-radius: var(--radius-sm) !important;
     color: var(--text) !important;
-    background: rgba(124,58,237,0.15) !important;
+    font-family: 'Inter', sans-serif !important;
+    transition: border-color 0.2s, box-shadow 0.2s !important;
+}
+[data-testid="stTextInput"] input:focus,
+[data-testid="stNumberInput"] input:focus {
     border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px var(--accent-glow) !important;
 }
-[data-baseweb="tab-highlight"], [data-baseweb="tab-border"] {
-    display: none !important;
+[data-testid="stSelectbox"] > div > div {
+    background: #0f0f16 !important;
+    border: 1px solid var(--border-bright) !important;
+    border-radius: var(--radius-sm) !important;
+    color: var(--text) !important;
 }
-[data-baseweb="tab-list"] {
-    gap: 6px !important;
-    background: var(--bg-subtle) !important;
+[data-testid="stButton"] > button {
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 600 !important;
+    border-radius: var(--radius-sm) !important;
+    transition: all 0.2s ease !important;
+}
+[data-testid="stButton"] > button[kind="primary"] {
+    background: linear-gradient(135deg, var(--accent), #6366f1) !important;
+    border: none !important;
+    box-shadow: 0 2px 12px var(--accent-glow) !important;
+}
+[data-testid="stButton"] > button[kind="primary"]:hover {
+    box-shadow: 0 4px 20px rgba(124,58,237,0.45) !important;
+    transform: translateY(-1px) !important;
+}
+[data-testid="stDownloadButton"] > button {
+    background: linear-gradient(135deg, #065f46, #047857) !important;
+    color: #fff !important;
+    border: 1px solid rgba(16,185,129,0.4) !important;
+    border-radius: var(--radius-sm) !important;
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 600 !important;
+    box-shadow: 0 2px 10px var(--green-glow) !important;
+}
+[data-testid="stDownloadButton"] > button:hover {
+    box-shadow: 0 4px 18px rgba(16,185,129,0.4) !important;
+    transform: translateY(-1px) !important;
+}
+/* Dataframe styling */
+[data-testid="stDataFrame"] {
     border: 1px solid var(--border) !important;
-    border-radius: 12px !important;
-    padding: 4px !important;
-    margin-bottom: 1.5rem;
+    border-radius: var(--radius) !important;
+    overflow: hidden !important;
+}
+/* Info/warning/error boxes */
+[data-testid="stAlert"] {
+    border-radius: var(--radius-sm) !important;
+    font-family: 'Inter', sans-serif !important;
+}
+/* Subheader styling */
+[data-testid="stHeadingWithActionElements"] h3,
+.stSubheader {
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 700 !important;
+    color: var(--text) !important;
+}
+/* Caption */
+[data-testid="stCaptionContainer"] {
+    color: var(--text-muted) !important;
+    font-family: 'Inter', sans-serif !important;
+}
+/* Checkbox */
+[data-testid="stCheckbox"] label {
+    font-family: 'Inter', sans-serif !important;
+    color: var(--text) !important;
+}
+/* Radio */
+[data-testid="stRadio"] label {
+    font-family: 'Inter', sans-serif !important;
+    color: var(--text) !important;
 }
 </style>
 """
@@ -190,15 +424,33 @@ st.markdown(CSS_STYLE, unsafe_allow_html=True)
 def render_html(html_content):
     st.markdown(textwrap.dedent(html_content), unsafe_allow_html=True)
 
-def draw_metric_card(label, value, footer_text=None, icon_class="fa-solid fa-chart-line"):
-    footer_html = f'<div class="metric-footer"><i class="{icon_class}"></i> {footer_text}</div>' if footer_text else ""
+def draw_metric_card(label, value, footer_text=None, icon_class="fa-solid fa-chart-line", color="purple"):
+    footer_html = f'<div class="mc-footer"><i class="{icon_class}"></i> {footer_text}</div>' if footer_text else ""
     render_html(f"""
-    <div class="metric-card">
-        <div class="metric-label">{label}</div>
-        <div class="metric-value">{value}</div>
+    <div class="mc mc-{color}">
+        <div class="mc-icon"><i class="{icon_class}"></i></div>
+        <div class="mc-label">{label}</div>
+        <div class="mc-value">{value}</div>
         {footer_html}
     </div>
     """)
+
+def draw_step_bar(steps, active=0):
+    """Render a horizontal step indicator bar. steps = list of label strings, active = 0-indexed current step."""
+    items_html = ""
+    for i, step in enumerate(steps):
+        if i < active:
+            cls = "done"
+            icon = '<i class="fa-solid fa-check" style="font-size:0.65rem"></i>'
+        elif i == active:
+            cls = "active"
+            icon = str(i + 1)
+        else:
+            cls = ""
+            icon = str(i + 1)
+        sep = '<span class="step-sep"><i class="fa-solid fa-chevron-right"></i></span>' if i < len(steps)-1 else ""
+        items_html += f'<div class="step-item {cls}"><div class="step-num">{icon}</div>{step}</div>{sep}'
+    render_html(f'<div class="step-bar">{items_html}</div>')
 
 def generate_invoice_html(invoice_data):
     """Generates the clean printable tax invoice HTML with direct styles embedded."""
@@ -373,29 +625,34 @@ def generate_invoice_pdf(invoice_data):
         raise RuntimeError("Failed to generate PDF document.")
     return pdf_buffer.getvalue()
 
-# 4. Brand Header Layout
+# 4. Brand Header
 st.markdown("""
-<div class="brand-container">
-    <div>
-        <div class="brand-title">PIONEER <span>FLOW</span></div>
-        <div class="brand-subtitle">Streamlit Session Manager &bull; Mechanical Billing MVP</div>
+<div class="pf-header">
+  <div class="pf-header-inner">
+    <div class="pf-logo-wrap">
+      <div class="pf-logo-icon">⚡</div>
+      <div>
+        <div class="pf-wordmark">PIONEER FLOW</div>
+        <div class="pf-tagline">Mechanical Billing &amp; Stock Automation Platform</div>
+      </div>
     </div>
-    <div style="font-size: 0.8rem; color: #71717a; text-align: right;">
-        Status: <span class="badge badge-green">Online</span><br>
-        Relational Engine: <span class="badge badge-blue">SQLite3</span>
+    <div class="pf-status-cluster">
+      <div class="pf-pill"><div class="pf-dot pf-dot-green"></div>System Online</div>
+      <div class="pf-pill"><div class="pf-dot pf-dot-blue"></div>SQLite3 Engine</div>
     </div>
+  </div>
 </div>
 """, unsafe_allow_html=True)
 
 # 5. Core Navigation Tabs
 t_dash, t_catalog, t_inventory, t_customers, t_invoice, t_quotation, t_history, t_manual, t_settings = st.tabs([
-    "📊 Dashboard", 
-    "📦 Product Catalog", 
-    "🔍 Available Inventory",
-    "👥 Customers", 
-    "📝 New Invoice", 
+    "📊 Dashboard",
+    "📦 Catalog",
+    "🔍 Inventory",
+    "👥 Customers",
+    "📝 New Invoice",
     "📄 New Quotation",
-    "📜 History Ledger",
+    "📜 History",
     "➕ Manual Entry",
     "⚙️ Settings"
 ])
@@ -478,15 +735,16 @@ with t_dash:
     price_import = query_db("SELECT imported_at FROM IMPORT_LOG WHERE import_type='cost' ORDER BY imported_at DESC LIMIT 1", one=True)
     last_price = datetime.fromisoformat(price_import['imported_at']).strftime('%b %d, %Y %H:%M') if price_import else "Never"
 
+    render_html('<div class="section-head"><i class="fa-solid fa-gauge-high"></i> System Overview <span class="sub">Live metrics</span></div>')
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        draw_metric_card("Total Products", f"{prod_count:,}", f"Last Price: {last_price}", "fa-solid fa-barcode")
+        draw_metric_card("Total Products", f"{prod_count:,}", f"Last Price: {last_price}", "fa-solid fa-barcode", "purple")
     with col2:
-        draw_metric_card("Total Customers", f"{cust_count:,}", "Active billing registry", "fa-solid fa-users")
+        draw_metric_card("Total Customers", f"{cust_count:,}", "Active billing registry", "fa-solid fa-users", "cyan")
     with col3:
-        draw_metric_card("Total Invoices", f"{inv_count:,}", "Generated ledger entries", "fa-solid fa-receipt")
+        draw_metric_card("Total Invoices", f"{inv_count:,}", "Generated ledger entries", "fa-solid fa-receipt", "green")
     with col4:
-        draw_metric_card("Last Inventory Sync", last_inventory, "Upload timeline sync date", "fa-solid fa-clock")
+        draw_metric_card("Last Inventory Sync", last_inventory, "Upload timeline sync date", "fa-solid fa-clock", "amber")
 
 
 
@@ -535,7 +793,7 @@ with t_catalog:
 
 # --- TAB: AVAILABLE INVENTORY ---
 with t_inventory:
-    st.markdown("### 🔍 Stock Group Reorder Status & Inventory")
+    render_html('<div class="section-head"><i class="fa-solid fa-warehouse"></i> Stock Reorder Status &amp; Inventory</div>')
     
     settings = OrderService.get_settings()
     excel_url = settings.get('stock_excel_url', '')
@@ -562,13 +820,14 @@ with t_inventory:
     # KPIs layout
     col_st1, col_st2, col_st3, col_st4 = st.columns(4)
     with col_st1:
-        draw_metric_card("Stocked SKUs", f"{stock_stats['active_skus'] or 0:,}", "Items with stock > 0", "fa-solid fa-boxes-stacked")
+        draw_metric_card("Stocked SKUs", f"{stock_stats['active_skus'] or 0:,}", "Items with stock > 0", "fa-solid fa-boxes-stacked", "green")
     with col_st2:
-        draw_metric_card("Total Stock", f"{int(stock_stats['total_stock'] or 0):,} pcs", "Total pieces in warehouse", "fa-solid fa-layer-group")
+        draw_metric_card("Total Stock", f"{int(stock_stats['total_stock'] or 0):,} pcs", "Total pieces in warehouse", "fa-solid fa-layer-group", "cyan")
     with col_st3:
-        draw_metric_card("Shortfall Items", f"{stock_stats['shortfall_skus'] or 0:,}", "SKUs below reorder level", "fa-solid fa-triangle-exclamation")
+        shortfall_count = stock_stats['shortfall_skus'] or 0
+        draw_metric_card("Shortfall Items", f"{shortfall_count:,}", "SKUs below reorder level", "fa-solid fa-triangle-exclamation", "red" if shortfall_count > 0 else "amber")
     with col_st4:
-        draw_metric_card("Asset Value", f"₹{stock_stats['total_value'] or 0:,.2f}", "Calculated via current cost rates", "fa-solid fa-indian-rupee-sign")
+        draw_metric_card("Asset Value", f"Rs.{stock_stats['total_value'] or 0:,.0f}", "Calculated via current cost rates", "fa-solid fa-indian-rupee-sign", "purple")
         
     st.markdown("<br>", unsafe_allow_html=True)
     
@@ -752,7 +1011,8 @@ with t_customers:
 
 # --- TAB: NEW INVOICE ---
 with t_invoice:
-    st.markdown("### Interactive Invoice Generator")
+    render_html('<div class="section-head"><i class="fa-solid fa-file-invoice"></i> Invoice Generator</div>')
+    draw_step_bar(["Enter Line Items", "Customer &amp; Billing", "Review &amp; Generate"], active=0 if len(st.session_state.invoice_items)==0 else 1)
     
     # Left column for Item additions (Catalog Item Details)
     # Right column for Customer & Billing Details + Totals (Live totals & settings)
@@ -1165,7 +1425,8 @@ if hasattr(st, "dialog"):
 
 # --- TAB: NEW QUOTATION ---
 with t_quotation:
-    st.markdown("### Interactive Proforma Quotation Generator")
+    render_html('<div class="section-head"><i class="fa-solid fa-file-lines"></i> Proforma Quotation Generator</div>')
+    draw_step_bar(["Enter Line Items", "Customer &amp; Billing", "Verify &amp; Confirm"], active=0 if len(st.session_state.quotation_items)==0 else 1)
     
     # Left column for Item additions (tabulated grid)
     # Right column for Customer & Billing Details + Totals (Live totals & settings)
@@ -1477,7 +1738,7 @@ with t_quotation:
 
 # --- TAB: LEDGER HISTORY ---
 with t_history:
-    st.markdown("### 📜 System History Ledger")
+    render_html('<div class="section-head"><i class="fa-solid fa-clock-rotate-left"></i> System History Ledger</div>')
     
     t_hist_inv, t_hist_qtn = st.tabs(["🧾 Invoices History", "📄 Quotations History"])
     
@@ -1679,7 +1940,7 @@ with t_manual:
 
 # --- TAB: SETTINGS ---
 with t_settings:
-    st.markdown("### ⚙️ System Configurations")
+    render_html('<div class="section-head"><i class="fa-solid fa-sliders"></i> System Configurations</div>')
     
     settings = OrderService.get_settings()
     current_gst = float(settings.get('gst_rate', 18.0))
@@ -1687,12 +1948,12 @@ with t_settings:
     current_sync_enabled = settings.get('auto_sync_enabled', '0') == '1'
     current_interval = float(settings.get('auto_sync_interval', 15.0))
     
-    st.subheader("1. General Configurations")
+    render_html('<div class="setting-section"><div class="setting-section-title"><i class="fa-solid fa-percent"></i> General Tax Configuration</div></div>')
     new_gst_rate = st.number_input("Default GST Percentage (%)", min_value=0.0, max_value=100.0, step=0.1, value=current_gst)
     
-    st.subheader("2. Stock Group Reorder Excel Cloud Sync")
-    st.write("Link your local Stock Group Reorder Excel file. Upload it to Google Drive/OneDrive, share as 'Anyone with link can view', and paste the URL below.")
-    
+    st.markdown("<br>", unsafe_allow_html=True)
+    render_html('<div class="setting-section"><div class="setting-section-title"><i class="fa-solid fa-cloud"></i> Stock Excel Cloud Sync</div></div>')
+    st.caption("Link your Stock Group Reorder Excel file. Upload to Google Drive/OneDrive, share as 'Anyone with link can view', and paste the URL below.")
     new_url = st.text_input("Excel / Google Sheets Share URL", value=current_url, placeholder="https://docs.google.com/spreadsheets/d/...")
     new_sync_enabled = st.checkbox("Enable 24/7 Background Auto-Sync", value=current_sync_enabled)
     new_interval = st.number_input("Auto-Sync Interval (Minutes)", min_value=1.0, max_value=1440.0, step=1.0, value=current_interval)
@@ -1723,9 +1984,9 @@ with t_settings:
                     else:
                         st.error(f"Sync failed: {', '.join(res['errors'])}")
                         
-    st.subheader("3. Import Price List")
-    st.write("Upload the Excel workbook (.xlsx, .xls) containing the pricing list sheet to update system costs.")
-    
+    st.markdown("<br>", unsafe_allow_html=True)
+    render_html('<div class="setting-section"><div class="setting-section-title"><i class="fa-solid fa-file-arrow-up"></i> Import Price List</div></div>')
+    st.caption("Upload the Excel workbook (.xlsx, .xls) containing the pricing list sheet to update system costs.")
     price_file = st.file_uploader("Select Price List Excel Workbook", type=["xlsx", "xls"], key="price_file")
     cost_sheet = st.text_input("Price List Sheet Name", "PRICE LIST", key="cost_sheet")
     
@@ -1733,19 +1994,14 @@ with t_settings:
         if price_file is None:
             st.error("Please upload an Excel workbook first.")
         else:
-            # Save temp file
             temp_path = os.path.join("uploads", price_file.name)
             os.makedirs("uploads", exist_ok=True)
             with open(temp_path, "wb") as f:
                 f.write(price_file.getvalue())
-            
             with st.spinner("Importing product pricing lists..."):
                 cost_res = ImportService.import_costs(temp_path, sheet_name=cost_sheet, filename=price_file.name)
-            
-            # clean up temp file
             try: os.remove(temp_path)
             except: pass
-            
             if cost_res['status'] == 'failed':
                 st.error(f"Price list upload failed: {', '.join(cost_res['errors'])}")
             else:
