@@ -94,20 +94,20 @@ class ImportService:
         min_reorder_col = find_col(df.columns, ['min reorder qty', 'min reorder', 'minimum order qty', 'min reorder quantity'])
         order_to_place_col = find_col(df.columns, ['order to be placed', 'placed order', 'order to place', 'to be placed', 'order to be placed (pcs)'])
 
-        def parse_float(row, col_name, default=0.0):
+        def parse_float_or_none(row, col_name):
             if not col_name:
-                return default
+                return None
             val = row.get(col_name)
             if pd.isna(val):
-                return default
+                return None
             try:
                 cleaned = str(val).replace(',', '').strip()
                 match = re.search(r'[-+]?\d*\.?\d+', cleaned)
                 if match:
                     return float(match.group(0))
-                return default
+                return None
             except Exception:
-                return default
+                return None
 
         total_records = len(df)
         successful_records = 0
@@ -121,6 +121,8 @@ class ImportService:
         
         for idx, row in df.iterrows():
             item_code = str(row.get(item_code_col, '')).strip()
+            if item_code.endswith('.0'):
+                item_code = item_code[:-2]
             if not item_code or item_code.lower() == 'nan' or item_code.lower() == 'total':
                 continue
                 
@@ -128,26 +130,35 @@ class ImportService:
             try:
                 cur.execute(f"SAVEPOINT {savepoint_name};")
                 
-                stock_val = parse_float(row, stock_col, 0.0)
-                purc_val = parse_float(row, purc_col, 0.0)
-                sales_val = parse_float(row, sales_col, 0.0)
+                stock_val = parse_float_or_none(row, stock_col) or 0.0
+                purc_val = parse_float_or_none(row, purc_col) or 0.0
+                sales_val = parse_float_or_none(row, sales_col) or 0.0
                 
-                # nett_available: if column present, use it; otherwise compute: stock + purc - sales
-                if nett_col:
-                    nett_val = parse_float(row, nett_col, 0.0)
+                # nett_available: if Excel cell has value, use it; otherwise compute: stock + purc - sales
+                nett_raw = parse_float_or_none(row, nett_col)
+                if nett_raw is not None:
+                    nett_val = nett_raw
                 else:
                     nett_val = stock_val + purc_val - sales_val
                     
-                reorder_val = parse_float(row, reorder_col, 0.0)
+                reorder_raw = parse_float_or_none(row, reorder_col)
+                reorder_val = reorder_raw if reorder_raw is not None else 0.0
                 
-                # short_fall: if column present, use it; otherwise compute: max(0, reorder - nett)
-                if shortfall_col:
-                    shortfall_val = parse_float(row, shortfall_col, 0.0)
+                # short_fall: if Excel cell has value, use it; otherwise compute: max(0, reorder - nett)
+                shortfall_raw = parse_float_or_none(row, shortfall_col)
+                if shortfall_raw is not None:
+                    shortfall_val = shortfall_raw
                 else:
                     shortfall_val = max(0.0, reorder_val - nett_val)
                     
-                min_reorder_val = parse_float(row, min_reorder_col, 0.0)
-                order_to_place_val = parse_float(row, order_to_place_col, 0.0)
+                min_reorder_raw = parse_float_or_none(row, min_reorder_col)
+                min_reorder_val = min_reorder_raw if min_reorder_raw is not None else 0.0
+                
+                order_to_place_raw = parse_float_or_none(row, order_to_place_col)
+                if order_to_place_raw is not None:
+                    order_to_place_val = order_to_place_raw
+                else:
+                    order_to_place_val = max(shortfall_val, min_reorder_val) if shortfall_val > 0 else 0.0
                 
                 # 1. Check if product exists
                 cur.execute("SELECT id FROM PRODUCTS WHERE part_number = ?", (item_code,))
