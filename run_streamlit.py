@@ -226,12 +226,12 @@ def generate_invoice_html(invoice_data):
     for idx, item in enumerate(invoice_data['items']):
         items_rows += f"""
         <tr>
-            <td>{idx + 1}</td>
+            <td style="text-align: center;">{idx + 1}</td>
             <td><strong>{item['part_number_snapshot']}</strong></td>
             <td style="text-align: right;">{int(item['quantity'])}</td>
-            <td style="text-align: right;">₹{item['unit_price']:.2f}</td>
+            <td style="text-align: right;">Rs. {item['unit_price']:.2f}</td>
             <td style="text-align: right;">{item['discount_percentage']:.1f}%</td>
-            <td style="text-align: right;">₹{item['line_total']:.2f}</td>
+            <td style="text-align: right;">Rs. {item['line_total']:.2f}</td>
         </tr>
         """
         
@@ -241,86 +241,64 @@ def generate_invoice_html(invoice_data):
     <head>
         <title>{doc_title} {invoice_data['invoice_number']}</title>
         <style>
-            body {{ font-family: Arial, sans-serif; color: #111; padding: 20px; background-color: #fff; }}
-            .sheet {{ max-width: 800px; margin: 0 auto; border: 1px solid #ccc; padding: 30px; border-radius: 6px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }}
-            .header-row {{ display: flex; justify-content: space-between; align-items: flex-start; }}
-            .brand h2 {{ margin: 0; font-size: 20px; font-weight: bold; color: #111; }}
-            .brand p {{ margin: 3px 0; font-size: 12px; color: #555; line-height: 1.4; }}
-            .doc-title {{ text-align: right; }}
-            .doc-title h1 {{ margin: 0 0 10px 0; font-size: 24px; font-weight: bold; color: #7c3aed; }}
-            .badge-row {{ display: flex; justify-content: flex-end; gap: 10px; font-size: 12px; margin-bottom: 3px; }}
-            .badge-lbl {{ font-weight: bold; color: #555; }}
-            .divider {{ border: none; border-top: 1.5px solid #eee; margin: 20px 0; }}
-            .bill-to h4 {{ margin: 0 0 5px 0; font-size: 12px; color: #6b7280; text-transform: uppercase; }}
-            .bill-to h3 {{ margin: 0 0 5px 0; font-size: 16px; font-weight: bold; }}
-            .bill-to p {{ margin: 2px 0; font-size: 13px; color: #444; }}
-            .items-table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
-            .items-table th {{ background-color: #f3f4f6; color: #374151; font-weight: bold; font-size: 11px; text-transform: uppercase; border: 1px solid #d1d5db; padding: 6px 10px; text-align: left; }}
-            .items-table td {{ padding: 6px 10px; border: 1px solid #d1d5db; font-size: 12px; }}
+            body {{ font-family: Helvetica, Arial, sans-serif; color: #111; padding: 10px; background-color: #fff; }}
+            .sheet {{ max-width: 800px; margin: 0 auto; border: 1px solid #ccc; padding: 25px; border-radius: 6px; }}
+            .divider {{ border: none; border-top: 1.5px solid #eee; margin: 15px 0; }}
+            .items-table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }}
+            .items-table th {{ background-color: #f3f4f6; color: #374151; font-weight: bold; font-size: 11px; text-transform: uppercase; border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; }}
+            .items-table td {{ padding: 6px 8px; border: 1px solid #d1d5db; font-size: 11px; }}
             .items-table tr:nth-child(even) {{ background-color: #f9fafb; }}
-            .totals-row {{ display: flex; justify-content: space-between; margin-top: 20px; }}
-            .bank {{ width: 45%; border: 1px solid #eee; border-radius: 6px; padding: 12px; font-size: 11px; color: #555; line-height: 1.5; }}
-            .bank h4 {{ margin: 0 0 5px 0; color: #111; font-weight: bold; }}
-            .totals-tbl {{ width: 45%; border-collapse: collapse; }}
-            .totals-tbl td {{ padding: 5px; font-size: 13px; color: #444; }}
-            .totals-tbl tr.grand-row td {{ font-weight: bold; font-size: 16px; color: #111; border-top: 2px solid #111; padding-top: 8px; }}
-            .sig-row {{ display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px; }}
-            .decl {{ width: 50%; font-size: 10px; color: #888; line-height: 1.4; }}
-            .sig-block {{ width: 40%; text-align: center; font-size: 12px; }}
-            .sig-space {{ height: 50px; border-bottom: 1px solid #ccc; margin-bottom: 5px; }}
             @media print {{
                 body {{ padding: 0; }}
-                .sheet {{ border: none; box-shadow: none; padding: 0; max-width: 100%; }}
-                .items-table th {{ border: 1.5px solid #000; background-color: #eaeaea !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+                .sheet {{ border: none; padding: 0; max-width: 100%; }}
+                .items-table th {{ border: 1.5px solid #000; background-color: #eaeaea !important; }}
                 .items-table td {{ border: 1.5px solid #000; }}
-                .bank {{ border: 1.5px solid #000; }}
-                .totals-tbl tr.grand-row td {{ border-top: 2.5px solid #000; }}
             }}
         </style>
     </head>
     <body>
         <div class="sheet">
-            <div class="header-row">
-                <div class="brand">
-                    <h2>PIONEER TECHNOLOGY</h2>
-                    <p>Sai Datta Reality, Survey No 452/1/1/10,<br>Alankapuram Road, Tapkir Nagar, Bhosari, Pune-412105</p>
-                    <p>Email: rajesh@pioneerautomation.in | UDYAM-MH-26-0071108</p>
-                </div>
-                <div class="doc-title">
-                    <h1>{doc_title}</h1>
-                    <div class="badge-row">
-                        <div class="badge-lbl">{num_lbl}</div>
-                        <div>{invoice_data['invoice_number']}</div>
-                    </div>
-                    <div class="badge-row">
-                        <div class="badge-lbl">Date:</div>
-                        <div>{invoice_data['invoice_date']}</div>
-                    </div>
-                    <div class="badge-row">
-                        <div class="badge-lbl">Order Ref:</div>
-                        <div>{order['order_number']}</div>
-                    </div>
-                </div>
-            </div>
+            <!-- HEADER ROW TABLE -->
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
+                <tr>
+                    <td style="width: 60%; vertical-align: top; border: none; padding: 0;">
+                        <h2 style="margin: 0; font-size: 20px; font-weight: bold; color: #111;">PIONEER TECHNOLOGY</h2>
+                        <p style="margin: 3px 0; font-size: 11px; color: #555; line-height: 1.4;">Sai Datta Reality, Survey No 452/1/1/10,<br>Alankapuram Road, Tapkir Nagar, Bhosari, Pune-412105</p>
+                        <p style="margin: 3px 0; font-size: 11px; color: #555;">Email: rajesh@pioneerautomation.in | UDYAM-MH-26-0071108</p>
+                    </td>
+                    <td style="width: 40%; vertical-align: top; text-align: right; border: none; padding: 0;">
+                        <h1 style="margin: 0 0 8px 0; font-size: 22px; font-weight: bold; color: #7c3aed;">{doc_title}</h1>
+                        <p style="margin: 2px 0; font-size: 11px; color: #333;"><strong>{num_lbl}</strong> {invoice_data['invoice_number']}</p>
+                        <p style="margin: 2px 0; font-size: 11px; color: #333;"><strong>Date:</strong> {invoice_data['invoice_date']}</p>
+                        <p style="margin: 2px 0; font-size: 11px; color: #333;"><strong>Order Ref:</strong> {order['order_number']}</p>
+                    </td>
+                </tr>
+            </table>
             
             <div class="divider"></div>
             
-            <div class="bill-to">
-                <h4>BILL TO:</h4>
-                <h3>{order['customer_name_snapshot']}</h3>
-                <p><strong>GSTIN:</strong> {order['customer_gst_snapshot'] or 'N/A'}</p>
-                <p><strong>Payment Terms:</strong> {order['customer_terms_snapshot'] or 'Due on Receipt'}</p>
-            </div>
+            <!-- BILL TO TABLE -->
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                <tr>
+                    <td style="border: none; padding: 0;">
+                        <h4 style="margin: 0 0 4px 0; font-size: 11px; color: #6b7280; text-transform: uppercase;">BILL TO:</h4>
+                        <h3 style="margin: 0 0 4px 0; font-size: 15px; font-weight: bold;">{order['customer_name_snapshot']}</h3>
+                        <p style="margin: 2px 0; font-size: 12px; color: #444;"><strong>GSTIN:</strong> {order['customer_gst_snapshot'] or 'N/A'}</p>
+                        <p style="margin: 2px 0; font-size: 12px; color: #444;"><strong>Payment Terms:</strong> {order['customer_terms_snapshot'] or 'Due on Receipt'}</p>
+                    </td>
+                </tr>
+            </table>
             
+            <!-- ITEMS TABLE -->
             <table class="items-table">
                 <thead>
                     <tr>
-                        <th>Sr No.</th>
-                        <th>Part Number / Item Code</th>
-                        <th style="text-align: right;">Qty</th>
-                        <th style="text-align: right;">Rate / Pc</th>
-                        <th style="text-align: right;">Dis. %</th>
-                        <th style="text-align: right;">Net Value</th>
+                        <th style="width: 8%; text-align: center;">Sr No.</th>
+                        <th style="width: 42%;">Part Number / Item Code</th>
+                        <th style="width: 12%; text-align: right;">Qty</th>
+                        <th style="width: 13%; text-align: right;">Rate / Pc</th>
+                        <th style="width: 10%; text-align: right;">Dis. %</th>
+                        <th style="width: 15%; text-align: right;">Net Value</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -328,44 +306,58 @@ def generate_invoice_html(invoice_data):
                 </tbody>
             </table>
             
-            <div class="totals-row">
-                <div class="bank">
-                    <h4>Bank Details:</h4>
-                    <p>Bank Name: HDFC Bank Ltd</p>
-                    <p>A/C No: 50200067645167</p>
-                    <p>IFSC Code: HDFC0000104</p>
-                    <p>Branch: Bhosari, Pune</p>
-                </div>
-                <table class="totals-tbl">
-                    <tr>
-                        <td>Subtotal (Excl. GST):</td>
-                        <td style="text-align: right;">₹{subtotal:.2f}</td>
-                    </tr>
-                    <tr>
-                        <td>CGST ({half_gst:.1f}%):</td>
-                        <td style="text-align: right;">₹{half_gst_amount:.2f}</td>
-                    </tr>
-                    <tr>
-                        <td>SGST ({half_gst:.1f}%):</td>
-                        <td style="text-align: right;">₹{half_gst_amount:.2f}</td>
-                    </tr>
-                    <tr class="grand-row">
-                        <td>Grand Total:</td>
-                        <td style="text-align: right;">₹{grand_total:.2f}</td>
-                    </tr>
-                </table>
-            </div>
+            <!-- TOTALS & BANK DETAILS TABLE -->
+            <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                <tr>
+                    <td style="width: 48%; vertical-align: top; border: none; padding: 0;">
+                        <div style="border: 1px solid #d1d5db; border-radius: 6px; padding: 10px; font-size: 11px; color: #444; line-height: 1.5; background-color: #f9fafb;">
+                            <strong style="color: #111; font-size: 12px; display: block; margin-bottom: 4px;">Bank Details:</strong>
+                            Bank Name: HDFC Bank Ltd<br>
+                            A/C No: 50200067645167<br>
+                            IFSC Code: HDFC0000104<br>
+                            Branch: Bhosari, Pune
+                        </div>
+                    </td>
+                    <td style="width: 4%;"></td>
+                    <td style="width: 48%; vertical-align: top; border: none; padding: 0;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="padding: 4px 0; font-size: 12px; color: #444; border: none;">Subtotal (Excl. GST):</td>
+                                <td style="padding: 4px 0; font-size: 12px; color: #111; text-align: right; border: none;">Rs. {subtotal:.2f}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px 0; font-size: 12px; color: #444; border: none;">CGST ({half_gst:.1f}%):</td>
+                                <td style="padding: 4px 0; font-size: 12px; color: #111; text-align: right; border: none;">Rs. {half_gst_amount:.2f}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px 0; font-size: 12px; color: #444; border: none;">SGST ({half_gst:.1f}%):</td>
+                                <td style="padding: 4px 0; font-size: 12px; color: #111; text-align: right; border: none;">Rs. {half_gst_amount:.2f}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="2" style="border-top: 1.5px solid #111; padding: 0;"></td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0 0 0; font-size: 14px; font-weight: bold; color: #111; border: none;">Grand Total:</td>
+                                <td style="padding: 8px 0 0 0; font-size: 14px; font-weight: bold; color: #111; text-align: right; border: none;">Rs. {grand_total:.2f}</td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
             
-            <div class="sig-row">
-                <div class="decl">
-                    <p><strong>Declaration:</strong> We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.</p>
-                </div>
-                <div class="sig-block">
-                    <p>For PIONEER TECHNOLOGY</p>
-                    <div class="sig-space"></div>
-                    <p style="color: #555; font-size: 11px;">Authorized Signatory</p>
-                </div>
-            </div>
+            <!-- DECLARATION & SIGNATURE TABLE -->
+            <table style="width: 100%; border-collapse: collapse; margin-top: 35px;">
+                <tr>
+                    <td style="width: 55%; vertical-align: bottom; border: none; padding: 0; font-size: 10px; color: #666; line-height: 1.4;">
+                        <strong>Declaration:</strong> We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
+                    </td>
+                    <td style="width: 45%; vertical-align: bottom; text-align: center; border: none; padding: 0;">
+                        <p style="margin: 0; font-size: 11px; font-weight: bold;">For PIONEER TECHNOLOGY</p>
+                        <div style="height: 40px; border-bottom: 1px solid #999; margin: 8px auto 4px auto; width: 75%;"></div>
+                        <p style="margin: 0; font-size: 10px; color: #555;">Authorized Signatory</p>
+                    </td>
+                </tr>
+            </table>
         </div>
     </body>
     </html>
