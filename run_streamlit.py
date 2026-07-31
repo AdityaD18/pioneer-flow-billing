@@ -372,10 +372,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 5. Core Navigation Tabs
-t_dash, t_imports, t_catalog, t_customers, t_invoice, t_history, t_manual, t_settings = st.tabs([
+t_dash, t_imports, t_catalog, t_inventory, t_customers, t_invoice, t_history, t_manual, t_settings = st.tabs([
     "📊 Dashboard", 
     "📁 Import Sheets", 
     "📦 Product Catalog", 
+    "🔍 Available Inventory",
     "👥 Customers", 
     "📝 New Invoice", 
     "📜 Invoice History",
@@ -616,6 +617,103 @@ with t_catalog:
                 "Price per 100 Pcs": f"₹{p['price_per_100_pcs']:.2f}" if p["price_per_100_pcs"] is not None else "₹0.00"
             })
         st.dataframe(pd.DataFrame(display_data), use_container_width=True, hide_index=True)
+
+# --- TAB: AVAILABLE INVENTORY ---
+with t_inventory:
+    st.markdown("### 🔍 Real-Time Available Stock")
+    
+    # 1. Fetch available stock KPIs
+    stock_stats = query_db(
+        """SELECT 
+             COUNT(CASE WHEN current_stock > 0 THEN 1 END) as active_skus,
+             SUM(CASE WHEN current_stock > 0 THEN current_stock ELSE 0 END) as total_stock,
+             SUM(CASE WHEN current_stock > 0 THEN current_stock * (COALESCE(c.price_per_100_pcs, 0) / 100.0) ELSE 0 END) as total_value
+           FROM INVENTORY i
+           LEFT JOIN PRODUCT_COSTS c ON i.product_id = c.product_id AND c.is_current = 1""",
+        one=True
+    )
+    
+    # KPIs layout
+    col_st1, col_st2, col_st3 = st.columns(3)
+    with col_st1:
+        draw_metric_card("Active Stocked SKUs", f"{stock_stats['active_skus'] or 0:,}", "Items with stock > 0", "fa-solid fa-boxes-stacked")
+    with col_st2:
+        draw_metric_card("Total Stock Quantity", f"{int(stock_stats['total_stock'] or 0):,} pcs", "Sum of current stock levels", "fa-solid fa-layer-group")
+    with col_st3:
+        draw_metric_card("Total Asset Value", f"₹{stock_stats['total_value'] or 0:,.2f}", "Calculated via current cost rates", "fa-solid fa-indian-rupee-sign")
+        
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # 2. Search & List stocked items
+    q_inv_search = st.text_input("Search Available Stock (Part Number, Make, Series)", placeholder="e.g. 206-118", key="inv_stock_search_input")
+    
+    # Base query for only items with stock > 0
+    if q_inv_search:
+        search_str = f"%{q_inv_search.strip()}%"
+        stocked_items = query_db(
+            """SELECT p.*, i.current_stock, c.price_per_100_pcs 
+               FROM PRODUCTS p
+               JOIN INVENTORY i ON p.id = i.product_id
+               LEFT JOIN PRODUCT_COSTS c ON p.id = c.product_id AND c.is_current = 1
+               WHERE i.current_stock > 0 AND (p.part_number LIKE ? OR p.part_name LIKE ? OR p.make LIKE ? OR p.series LIKE ?)
+               ORDER BY i.current_stock DESC, p.part_number ASC LIMIT 100""",
+            (search_str, search_str, search_str, search_str)
+        )
+    else:
+        stocked_items = query_db(
+            """SELECT p.*, i.current_stock, c.price_per_100_pcs 
+               FROM PRODUCTS p
+               JOIN INVENTORY i ON p.id = i.product_id
+               LEFT JOIN PRODUCT_COSTS c ON p.id = c.product_id AND c.is_current = 1
+               WHERE i.current_stock > 0
+               ORDER BY i.current_stock DESC, p.part_number ASC LIMIT 100"""
+        )
+        
+    if len(stocked_items) == 0:
+        st.info("No available stock found matching your search.")
+    else:
+        # Build list data
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        inv_rows = ""
+        for p in stocked_items:
+            stock = p['current_stock']
+            price_100 = p['price_per_100_pcs'] or 0.0
+            val_inr = stock * (price_100 / 100.0)
+            
+            # Badge styles based on stock level
+            badge_class = "badge-green" if stock >= 100 else "badge-amber"
+            
+            inv_rows += f"""
+            <tr>
+                <td><strong>{p['part_number']}</strong></td>
+                <td>{p['part_name'] or p['part_number']}</td>
+                <td>{p['make'] or 'WAGO'}</td>
+                <td>{p['series'] or '-'}</td>
+                <td><span class="badge {badge_class}">{int(stock)} pcs</span></td>
+                <td>₹{price_100:.2f}/100</td>
+                <td><strong>₹{val_inr:,.2f}</strong></td>
+            </tr>
+            """
+            
+        st.markdown(f"""
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Part Number</th>
+                    <th>Description</th>
+                    <th>Make</th>
+                    <th>Series</th>
+                    <th>Current Stock</th>
+                    <th>Price List Rate</th>
+                    <th>Stock Asset Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                {inv_rows}
+            </tbody>
+        </table>
+        """, unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB: CUSTOMERS ---
 with t_customers:
@@ -943,8 +1041,19 @@ with t_invoice:
                         st.error(f"Failed to generate invoice: {str(ex)}")
 
     # Display items table below configuration
-    st.subheader("Invoice Line Items Grid")
-    if len(st.session_state.invoice_items) > 0:
+    st.subheader("📋 Invoice Line Items Grid")
+    if len(st.session_state.invoice_items) == 0:
+        st.info("No items added to invoice draft yet. Use the catalog item details panel on the left to add parts.")
+    else:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        col_gr1, col_gr2 = st.columns([5, 1])
+        with col_gr1:
+            st.markdown("*Use the table editor below to modify quantities or check 'Remove Item' to delete a row.*")
+        with col_gr2:
+            if st.button("Reset Draft", use_container_width=True, key="reset_draft_items"):
+                st.session_state.invoice_items = []
+                st.rerun()
+                
         # Build pandas dataframe for the st.data_editor
         df_editor_data = []
         for idx, i in enumerate(st.session_state.invoice_items):
@@ -969,7 +1078,8 @@ with t_invoice:
                 "Action": st.column_config.CheckboxColumn("Remove Item")
             },
             hide_index=True,
-            use_container_width=True
+            use_container_width=True,
+            key="inv_data_editor"
         )
         
         # Check updates
@@ -988,6 +1098,8 @@ with t_invoice:
         ):
             st.session_state.invoice_items = sync_items
             st.rerun()
+            
+        st.markdown('</div>', unsafe_allow_html=True)
 
     # If last invoice generated is active, show the printable view and download
     if st.session_state.last_invoice_generated:
