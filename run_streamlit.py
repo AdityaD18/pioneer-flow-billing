@@ -384,6 +384,20 @@ t_dash, t_imports, t_catalog, t_inventory, t_customers, t_invoice, t_history, t_
     "⚙️ Settings"
 ])
 
+# Toast persistence manager
+if "toast_msg" not in st.session_state:
+    st.session_state.toast_msg = None
+if "toast_icon" not in st.session_state:
+    st.session_state.toast_icon = "ℹ️"
+
+if st.session_state.toast_msg:
+    st.toast(st.session_state.toast_msg, icon=st.session_state.toast_icon)
+    st.session_state.toast_msg = None
+
+def trigger_toast(message, icon="ℹ️"):
+    st.session_state.toast_msg = message
+    st.session_state.toast_icon = icon
+
 # Initialize session states for UI controllers
 if "invoice_items" not in st.session_state:
     st.session_state.invoice_items = []
@@ -462,39 +476,16 @@ with t_imports:
             progress_bar.progress(100)
             status_text.text("Import synchronization finished.")
             
-            # Show summary
-            col_res1, col_res2 = st.columns(2)
-            with col_res1:
-                st.markdown("#### Inventory Sync Summary")
-                if inv_res['status'] == 'failed':
-                    st.error(f"Inventory failed: {inv_res['errors'][0] if inv_res['errors'] else 'Unknown Error'}")
-                else:
-                    msg = st.success if inv_res['status'] == 'success' else st.warning
-                    msg(f"Stock Complete ({inv_res['status'].upper()})")
-                    st.write(f"- Processed: {inv_res['total_records']}")
-                    st.write(f"- Success: {inv_res['successful_records']}")
-                    st.write(f"- Failed: {inv_res['failed_records']}")
-                    if inv_res['errors']:
-                        with st.expander("Inventory Skip Log"):
-                            st.write(inv_res['errors'])
-                            
-            with col_res2:
-                st.markdown("#### Cost Sync Summary")
-                if cost_res['status'] == 'failed':
-                    st.error(f"Cost failed: {cost_res['errors'][0] if cost_res['errors'] else 'Unknown Error'}")
-                else:
-                    msg = st.success if cost_res['status'] == 'success' else st.warning
-                    msg(f"Costs Complete ({cost_res['status'].upper()})")
-                    st.write(f"- Processed: {cost_res['total_records']}")
-                    st.write(f"- Success: {cost_res['successful_records']}")
-                    st.write(f"- Failed: {cost_res['failed_records']}")
-                    if cost_res['errors']:
-                        with st.expander("Cost Skip Log"):
-                            st.write(cost_res['errors'])
-                            
             # clean up temp file
             try: os.remove(temp_path)
             except: pass
+            
+            if inv_res['status'] == 'failed' and cost_res['status'] == 'failed':
+                st.error("Excel upload failed. Please verify sheet names and column headers.")
+            else:
+                total_success = inv_res['successful_records'] + cost_res['successful_records']
+                trigger_toast(f"Excel sync successful! Processed {total_success} items.", icon="✅")
+                st.rerun()
             
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -672,11 +663,11 @@ with t_customers:
                         if editing_customer:
                             # Update
                             CustomerService.update_customer(editing_customer['id'], form_name, form_discount, form_gst, form_terms)
-                            st.success("Customer profile updated!")
+                            trigger_toast(f"Customer '{form_name}' updated successfully!", icon="👥")
                         else:
                             # Create
                             CustomerService.create_customer(form_name, form_discount, form_gst, form_terms)
-                            st.success("New customer profile created!")
+                            trigger_toast(f"New customer '{form_name}' registered successfully!", icon="🎉")
                         st.rerun()
                     except ValueError as e:
                         st.error(str(e))
@@ -685,7 +676,7 @@ with t_customers:
                 if st.button("Delete Profile", type="primary", use_container_width=True):
                     try:
                         CustomerService.delete_customer(editing_customer['id'])
-                        st.success("Profile deleted!")
+                        trigger_toast("Customer profile deleted.", icon="🗑️")
                         st.rerun()
                     except ValueError as e:
                         st.error(str(e))
@@ -843,7 +834,7 @@ with t_invoice:
                             "unit_price_100": selected_prod['price_per_100_pcs'] if selected_prod['price_per_100_pcs'] is not None else 0.0,
                             "discount_percentage": custom_disc
                         })
-                    st.success(f"Added product {selected_prod['part_number']}!")
+                    trigger_toast(f"Added product {selected_prod['part_number']} to draft!", icon="🛒")
                     st.rerun()
                     
     with col_right:
@@ -959,7 +950,7 @@ with t_invoice:
                         st.session_state.last_invoice_generated = invoice_data
                         # Reset items list
                         st.session_state.invoice_items = []
-                        st.success("Invoice generated successfully!")
+                        trigger_toast(f"Invoice '{invoice_data['invoice_number']}' generated successfully!", icon="📄")
                         st.rerun()
                     except Exception as ex:
                         st.error(f"Failed to generate invoice: {str(ex)}")
@@ -1090,7 +1081,7 @@ with t_history:
             
             col_print1, col_print2 = st.columns([3, 1])
             with col_print1:
-                st.success(f"Loaded invoice details for **{invoice_full['invoice_number']}**.")
+                st.markdown(f"#### 📄 Invoice Details: {invoice_full['invoice_number']}")
             with col_print2:
                 html_invoice = generate_invoice_html(invoice_full)
                 st.download_button(
@@ -1191,7 +1182,7 @@ with t_manual:
                         )
                         
                         cur.execute("COMMIT;")
-                        st.success(f"Product '{m_part.strip()}' successfully added to catalog and inventory!")
+                        trigger_toast(f"Product '{m_part.strip()}' added to catalog!", icon="📦")
                         st.rerun()
                 except Exception as ex:
                     try: cur.execute("ROLLBACK;")
@@ -1219,7 +1210,7 @@ with t_manual:
             else:
                 try:
                     CustomerService.create_customer(mc_name.strip(), mc_discount, mc_gst.strip() or None, mc_terms.strip() or None)
-                    st.success(f"Customer '{mc_name.strip()}' successfully registered!")
+                    trigger_toast(f"Customer '{mc_name.strip()}' registered!", icon="🎉")
                     st.rerun()
                 except ValueError as e:
                     st.error(str(e))
@@ -1236,5 +1227,5 @@ with t_settings:
     
     if st.button("Apply Config Settings"):
         execute_db("INSERT OR REPLACE INTO APP_SETTINGS (key, value) VALUES ('gst_rate', ?)", (str(new_gst_rate),))
-        st.success("Configuration settings updated successfully!")
+        trigger_toast("Settings updated successfully!", icon="⚙️")
         st.rerun()
