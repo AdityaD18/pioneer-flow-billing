@@ -8,6 +8,8 @@ class ImportService:
     @staticmethod
     def detect_headers_and_df(file_path, sheet_name, mandatory_synonym_groups):
         """Scans the first 30 rows of a sheet to locate the header row matching at least one synonym from each group."""
+        if hasattr(file_path, 'seek'):
+            file_path.seek(0)
         df_raw = pd.read_excel(file_path, sheet_name=sheet_name, header=None, nrows=30)
         
         header_row_idx = None
@@ -26,6 +28,8 @@ class ImportService:
         if header_row_idx is None:
             raise ValueError(f"Could not find a valid header row containing part numbers in sheet '{sheet_name}'.")
             
+        if hasattr(file_path, 'seek'):
+            file_path.seek(0)
         df = pd.read_excel(file_path, sheet_name=sheet_name, header=header_row_idx)
         df.columns = [str(c).strip() for c in df.columns]
         return df
@@ -38,6 +42,8 @@ class ImportService:
             df = cls.detect_headers_and_df(file_path, sheet_name, item_groups)
         except Exception as e:
             try:
+                if hasattr(file_path, 'seek'):
+                    file_path.seek(0)
                 xls = pd.ExcelFile(file_path)
                 matching_sheets = [s for s in xls.sheet_names if 'stock' in s.lower() or 'group' in s.lower() or 'reorder' in s.lower()]
                 if not matching_sheets:
@@ -53,11 +59,17 @@ class ImportService:
                     "errors": [f"Header detection failed for stock sheet: {str(ex)}"]
                 }
 
-        # Helper to find column key by synonyms
+        # Helper to find column key by exact match first, then substring match
         def find_col(df_cols, syns):
+            # Exact match (case insensitive)
             for c in df_cols:
-                c_lower = str(c).lower().strip()
-                if any(syn in c_lower for syn in syns):
+                c_clean = str(c).lower().strip()
+                if c_clean in syns:
+                    return c
+            # Substring match
+            for c in df_cols:
+                c_clean = str(c).lower().strip()
+                if any(syn in c_clean for syn in syns):
                     return c
             return None
 
@@ -72,14 +84,14 @@ class ImportService:
                 "errors": ["Could not locate an Item Code / Part Number column in inventory sheet."]
             }
 
-        stock_col = find_col(df.columns, ['closing stock', 'current stock', 'stock', 'qty', 'quantity', 'closing', 'stock qty', 'available', 'inventory'])
-        purc_col = find_col(df.columns, ['purc orders pending', 'purc orders', 'purchase pending', 'pending purchase', 'incoming stock', 'pending orders', 'purc'])
-        sales_col = find_col(df.columns, ['sale orders due', 'sale orders', 'sales due', 'due sales', 'outgoing stock', 'reserved stock', 'sale'])
-        nett_col = find_col(df.columns, ['nett available', 'net available', 'nett qty', 'net qty', 'available qty', 'nett'])
-        reorder_col = find_col(df.columns, ['re-order level', 'reorder level', 'reorder qty limit', 'minimum limit', 'level'])
+        stock_col = find_col(df.columns, ['closing stock', 'current stock', 'closing stock (pcs)', 'closing stock(pcs)', 'available stock', 'current stock (pcs)', 'stock'])
+        purc_col = find_col(df.columns, ['purc orders pending', 'purchase orders pending', 'purc orders', 'purchase pending', 'pending purchase', 'incoming stock', 'pending orders'])
+        sales_col = find_col(df.columns, ['sale orders due', 'sales orders due', 'sale orders', 'sales due', 'due sales', 'outgoing stock', 'reserved stock'])
+        nett_col = find_col(df.columns, ['nett available', 'net available', 'nett qty', 'net qty', 'available qty'])
+        reorder_col = find_col(df.columns, ['re-order level', 'reorder level', 'reorder qty limit', 'reorder level (pcs)'])
         shortfall_col = find_col(df.columns, ['short fall', 'shortfall', 'short qty', 'shortage'])
-        min_reorder_col = find_col(df.columns, ['min reorder qty', 'min reorder', 'min order', 'minimum order qty', 'min'])
-        order_to_place_col = find_col(df.columns, ['order to be placed', 'placed order', 'order quantity', 'order qty', 'to be placed'])
+        min_reorder_col = find_col(df.columns, ['min reorder qty', 'min reorder', 'minimum order qty', 'min reorder quantity'])
+        order_to_place_col = find_col(df.columns, ['order to be placed', 'placed order', 'order to place', 'to be placed', 'order to be placed (pcs)'])
 
         def parse_float(row, col_name, default=0.0):
             if not col_name:

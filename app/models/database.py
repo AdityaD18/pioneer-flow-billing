@@ -1,7 +1,10 @@
 import os
 import sqlite3
 from datetime import datetime
-from flask import g
+try:
+    from flask import g
+except ImportError:
+    g = None
 
 DATABASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'db'))
 DATABASE_PATH = os.path.join(DATABASE_DIR, 'database.db')

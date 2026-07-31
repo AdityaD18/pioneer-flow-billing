@@ -8,7 +8,15 @@ from datetime import datetime
 # Add the parent directory of app to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from flask import Flask, g
+try:
+    from flask import Flask, g
+    HAS_FLASK = True
+except ImportError:
+    HAS_FLASK = False
+    class DummyG(threading.local):
+        pass
+    g = DummyG()
+
 from app.models.database import init_db, get_db_connection, DATABASE_PATH
 from app.services.import_service import ImportService
 from app.services.customer_service import CustomerService
@@ -25,19 +33,20 @@ class TestInvoiceSystem(unittest.TestCase):
             except PermissionError:
                 pass
         init_db()
-        cls.app = Flask(__name__)
+        if HAS_FLASK:
+            cls.app = Flask(__name__)
 
     def setUp(self):
-        # Setup application context for each test
-        self.ctx = self.app.app_context()
-        self.ctx.push()
+        if HAS_FLASK:
+            self.ctx = self.app.app_context()
+            self.ctx.push()
         g._database = get_db_connection()
 
     def tearDown(self):
-        # Close connection and tear down context
-        if hasattr(g, '_database'):
+        if hasattr(g, '_database') and g._database:
             g._database.close()
-        self.ctx.pop()
+        if HAS_FLASK:
+            self.ctx.pop()
 
     def test_a_excel_imports(self):
         print("\n=== Testing Excel Imports ===")
@@ -163,8 +172,7 @@ class TestInvoiceSystem(unittest.TestCase):
         
         # We will spin 10 threads to generate invoices concurrently
         def generate_worker(thread_idx, flask_app):
-            # Create a separate application context for each thread
-            with flask_app.app_context():
+            def run_work():
                 try:
                     # Thread gets its own connection
                     g._database = get_db_connection()
@@ -185,10 +193,16 @@ class TestInvoiceSystem(unittest.TestCase):
                     g._database.close()
                 except Exception as ex:
                     errors.append(str(ex))
+
+            if flask_app:
+                with flask_app.app_context():
+                    run_work()
+            else:
+                run_work()
         
         # Run 10 threads in parallel
         for idx in range(10):
-            t = threading.Thread(target=generate_worker, args=(idx, self.app))
+            t = threading.Thread(target=generate_worker, args=(idx, getattr(self, 'app', None)))
             threads.append(t)
             t.start()
             
