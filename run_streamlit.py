@@ -1113,6 +1113,8 @@ if hasattr(st, "dialog"):
         
         calc = OrderService.calculate_order(cust_payload, items_input)
         
+        # Build tabulated Excel grid of selected items
+        grid_data = []
         for idx, item in enumerate(items_input):
             part_num = item['part_number']
             p_info = query_db(
@@ -1126,42 +1128,28 @@ if hasattr(st, "dialog"):
                 one=True
             )
             
-            st.markdown('<div class="panel" style="margin-bottom: 12px; border-left: 4px solid #38bdf8;">', unsafe_allow_html=True)
-            col_v1, col_v2 = st.columns([1, 3])
-            with col_v1:
-                make_name = p_info['make'] if p_info and p_info['make'] else 'WAGO'
-                series_name = p_info['series'] if p_info and p_info['series'] else '-'
-                st.markdown(f"""
-                <div style="background:#1e293b; border:1px solid #334155; border-radius:8px; padding:12px; text-align:center;">
-                    <div style="font-size:28px; margin-bottom:4px;">📦</div>
-                    <strong style="color:#38bdf8; font-size:15px;">{part_num}</strong><br>
-                    <span style="font-size:11px; color:#94a3b8;">Make: {make_name}</span><br>
-                    <span style="font-size:11px; color:#94a3b8;">Series: {series_name}</span>
-                </div>
-                """, unsafe_allow_html=True)
-            with col_v2:
-                stock_val = p_info['current_stock'] if p_info and p_info['current_stock'] is not None else 0
-                purc_val = p_info['purc_orders_pending'] if p_info and p_info['purc_orders_pending'] is not None else 0
-                sale_val = p_info['sale_orders_due'] if p_info and p_info['sale_orders_due'] is not None else 0
-                nett_val = p_info['nett_available'] if p_info and p_info['nett_available'] is not None else 0
-                reorder_val = p_info['reorder_level'] if p_info and p_info['reorder_level'] is not None else 0
-                shortfall_val = p_info['short_fall'] if p_info and p_info['short_fall'] is not None else 0
-                
-                st.markdown(f"**Item Code:** `{part_num}` | **Quantity:** `{int(item['quantity'])} pcs` | **Price/100:** `₹{item['unit_price_100']:.2f}`")
-                st.markdown(f"""
-                <div style="font-size:12px; background:#0f172a; padding:8px 12px; border-radius:6px; margin-top:6px;">
-                    <strong>Sheet Properties & Stock Metrics:</strong><br>
-                    Closing Stock: <strong style="color:#4ade80;">{int(stock_val)} pcs</strong> | 
-                    Purc Pending: {int(purc_val)} | 
-                    Sale Due: {int(sale_val)} | 
-                    Nett Available: <strong>{int(nett_val)}</strong> | 
-                    Reorder Level: {int(reorder_val)} | 
-                    Shortfall: <span style="color:#f87171;">{int(shortfall_val)}</span>
-                </div>
-                """, unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+            calc_item = calc['items'][idx] if idx < len(calc['items']) else None
+            line_tot = calc_item['line_total'] if calc_item else 0.0
             
-        st.markdown(f"### **Grand Total:** ₹{calc['grand_total']:.2f}")
+            grid_data.append({
+                "Item Code": part_num,
+                "Closing Stock": int(p_info['current_stock']) if p_info and p_info['current_stock'] is not None else 0,
+                "Purc Orders Pending": int(p_info['purc_orders_pending']) if p_info and p_info['purc_orders_pending'] is not None else 0,
+                "Sale Orders Due": int(p_info['sale_orders_due']) if p_info and p_info['sale_orders_due'] is not None else 0,
+                "Nett Available": int(p_info['nett_available']) if p_info and p_info['nett_available'] is not None else 0,
+                "Re-order Level": int(p_info['reorder_level']) if p_info and p_info['reorder_level'] is not None else 0,
+                "Short fall": int(p_info['short_fall']) if p_info and p_info['short_fall'] is not None else 0,
+                "Min Reorder Qty": int(p_info['min_reorder_qty']) if p_info and p_info['min_reorder_qty'] is not None else 0,
+                "Order to be Placed": int(p_info['order_to_be_placed']) if p_info and p_info['order_to_be_placed'] is not None else 0,
+                "Qty Requested": int(item['quantity']),
+                "Price/100 (₹)": f"₹{item['unit_price_100']:.2f}",
+                "Line Total (₹)": f"₹{line_tot:.2f}"
+            })
+            
+        df_verify = pd.DataFrame(grid_data)
+        st.dataframe(df_verify, use_container_width=True, hide_index=True)
+        
+        st.markdown(f"**Subtotal:** ₹{calc['subtotal']:.2f} | **GST ({calc['gst_rate']}%):** ₹{calc['gst_amount']:.2f} | **Grand Total:** ₹{calc['grand_total']:.2f}")
         
         col_m_btn1, col_m_btn2 = st.columns([1, 1])
         with col_m_btn1:
