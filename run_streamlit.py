@@ -602,17 +602,7 @@ with t_inventory:
             # Badge styles based on stock level
             badge_class = "badge-green" if stock >= 100 else "badge-amber"
             
-            inv_rows += f"""
-            <tr>
-                <td><strong>{p['part_number']}</strong></td>
-                <td>{p['part_name'] or p['part_number']}</td>
-                <td>{p['make'] or 'WAGO'}</td>
-                <td>{p['series'] or '-'}</td>
-                <td><span class="badge {badge_class}">{int(stock)} pcs</span></td>
-                <td>₹{price_100:.2f}/100</td>
-                <td><strong>₹{val_inr:,.2f}</strong></td>
-            </tr>
-            """
+            inv_rows += f"<tr><td><strong>{p['part_number']}</strong></td><td>{p['part_name'] or p['part_number']}</td><td>{p['make'] or 'WAGO'}</td><td>{p['series'] or '-'}</td><td><span class=\"badge {badge_class}\">{int(stock)} pcs</span></td><td>₹{price_100:.2f}/100</td><td><strong>₹{val_inr:,.2f}</strong></td></tr>"
             
         render_html(f"""
         <table class="data-table">
@@ -706,14 +696,7 @@ with t_customers:
             else:
                 inv_rows = ""
                 for inv in cust_invoices:
-                    inv_rows += f"""
-                    <tr>
-                        <td><strong>{inv['invoice_number']}</strong></td>
-                        <td>{inv['invoice_date']}</td>
-                        <td>{inv['order_number']}</td>
-                        <td><strong>₹{inv['grand_total']:.2f}</strong></td>
-                    </tr>
-                    """
+                    inv_rows += f"<tr><td><strong>{inv['invoice_number']}</strong></td><td>{inv['invoice_date']}</td><td>{inv['order_number']}</td><td><strong>₹{inv['grand_total']:.2f}</strong></td></tr>"
                 render_html(f"""
                 <table class="data-table">
                     <thead>
@@ -739,14 +722,7 @@ with t_customers:
             for c in customers:
                 gst_val = c['gst_number'] or "-"
                 terms_val = c['payment_terms'] or "-"
-                cust_rows += f"""
-                <tr>
-                    <td><strong>{c['name']}</strong></td>
-                    <td>{c['discount_percentage']:.2f}%</td>
-                    <td>{gst_val}</td>
-                    <td>{terms_val}</td>
-                </tr>
-                """
+                cust_rows += f"<tr><td><strong>{c['name']}</strong></td><td>{c['discount_percentage']:.2f}%</td><td>{gst_val}</td><td>{terms_val}</td></tr>"
             render_html(f"""
             <table class="data-table">
                 <thead>
@@ -1101,15 +1077,7 @@ with t_history:
             # Show list table
             rows_html = ""
             for inv in invoices:
-                rows_html += f"""
-                <tr>
-                    <td><strong>{inv['invoice_number']}</strong></td>
-                    <td>{inv['invoice_date']}</td>
-                    <td>{inv['customer_name_snapshot']}</td>
-                    <td>{inv['order_number']}</td>
-                    <td><strong>₹{inv['grand_total']:.2f}</strong></td>
-                </tr>
-                """
+                rows_html += f"<tr><td><strong>{inv['invoice_number']}</strong></td><td>{inv['invoice_date']}</td><td>{inv['customer_name_snapshot']}</td><td>{inv['order_number']}</td><td><strong>₹{inv['grand_total']:.2f}</strong></td></tr>"
             render_html(f"""
             <table class="data-table">
                 <thead>
