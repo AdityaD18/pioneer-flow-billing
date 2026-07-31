@@ -21,6 +21,13 @@ CREATE TABLE IF NOT EXISTS INVENTORY (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     product_id INTEGER UNIQUE NOT NULL REFERENCES PRODUCTS(id) ON DELETE CASCADE,
     current_stock REAL DEFAULT 0,
+    purc_orders_pending REAL DEFAULT 0,
+    sale_orders_due REAL DEFAULT 0,
+    nett_available REAL DEFAULT 0,
+    reorder_level REAL DEFAULT 0,
+    short_fall REAL DEFAULT 0,
+    min_reorder_qty REAL DEFAULT 0,
+    order_to_be_placed REAL DEFAULT 0,
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

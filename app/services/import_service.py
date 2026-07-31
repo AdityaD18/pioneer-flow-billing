@@ -53,14 +53,16 @@ class ImportService:
                     "errors": [f"Header detection failed for stock sheet: {str(ex)}"]
                 }
 
+        # Helper to find column key by synonyms
+        def find_col(df_cols, syns):
+            for c in df_cols:
+                c_lower = str(c).lower().strip()
+                if any(syn in c_lower for syn in syns):
+                    return c
+            return None
+
         # Resolve columns
-        item_code_col = None
-        for c in df.columns:
-            c_lower = c.lower()
-            if any(syn in c_lower for syn in ['item code', 'part number', 'part no', 'partno', 'code', 'item_code', 'part_no']):
-                item_code_col = c
-                break
-        
+        item_code_col = find_col(df.columns, ['item code', 'part number', 'part no', 'partno', 'code', 'item_code', 'part_no'])
         if not item_code_col:
             return {
                 "status": "failed",
@@ -70,12 +72,26 @@ class ImportService:
                 "errors": ["Could not locate an Item Code / Part Number column in inventory sheet."]
             }
 
-        stock_col = None
-        for c in df.columns:
-            c_lower = c.lower()
-            if any(syn in c_lower for syn in ['closing stock', 'current stock', 'stock', 'qty', 'quantity', 'closing', 'stock qty', 'available', 'inventory']):
-                stock_col = c
-                break
+        stock_col = find_col(df.columns, ['closing stock', 'current stock', 'stock', 'qty', 'quantity', 'closing', 'stock qty', 'available', 'inventory'])
+        purc_col = find_col(df.columns, ['purc orders pending', 'purc orders', 'purchase pending', 'pending purchase', 'incoming stock', 'pending orders', 'purc'])
+        sales_col = find_col(df.columns, ['sale orders due', 'sale orders', 'sales due', 'due sales', 'outgoing stock', 'reserved stock', 'sale'])
+        nett_col = find_col(df.columns, ['nett available', 'net available', 'nett qty', 'net qty', 'available qty', 'nett'])
+        reorder_col = find_col(df.columns, ['re-order level', 'reorder level', 'reorder qty limit', 'minimum limit', 'level'])
+        shortfall_col = find_col(df.columns, ['short fall', 'shortfall', 'short qty', 'shortage'])
+        min_reorder_col = find_col(df.columns, ['min reorder qty', 'min reorder', 'min order', 'minimum order qty', 'min'])
+        order_to_place_col = find_col(df.columns, ['order to be placed', 'placed order', 'order quantity', 'order qty', 'to be placed'])
+
+        def parse_float(row, col_name, default=0.0):
+            if not col_name:
+                return default
+            val = row.get(col_name)
+            if pd.isna(val):
+                return default
+            try:
+                cleaned = str(val).replace(',', '').strip()
+                return float(cleaned)
+            except ValueError:
+                return default
 
         total_records = len(df)
         successful_records = 0
@@ -96,16 +112,26 @@ class ImportService:
             try:
                 cur.execute(f"SAVEPOINT {savepoint_name};")
                 
-                # Check for stock quantity
-                stock_val = 0.0
-                if stock_col:
-                    raw_stock = row.get(stock_col)
-                    if pd.notna(raw_stock):
-                        try:
-                            cleaned_stock = str(raw_stock).replace(',', '').strip()
-                            stock_val = float(cleaned_stock)
-                        except ValueError:
-                            raise ValueError(f"Invalid stock numeric value '{raw_stock}'")
+                stock_val = parse_float(row, stock_col, 0.0)
+                purc_val = parse_float(row, purc_col, 0.0)
+                sales_val = parse_float(row, sales_col, 0.0)
+                
+                # nett_available: if column present, use it; otherwise compute: stock + purc - sales
+                if nett_col:
+                    nett_val = parse_float(row, nett_col, 0.0)
+                else:
+                    nett_val = stock_val + purc_val - sales_val
+                    
+                reorder_val = parse_float(row, reorder_col, 0.0)
+                
+                # short_fall: if column present, use it; otherwise compute: max(0, reorder - nett)
+                if shortfall_col:
+                    shortfall_val = parse_float(row, shortfall_col, 0.0)
+                else:
+                    shortfall_val = max(0.0, reorder_val - nett_val)
+                    
+                min_reorder_val = parse_float(row, min_reorder_col, 0.0)
+                order_to_place_val = parse_float(row, order_to_place_col, 0.0)
                 
                 # 1. Check if product exists
                 cur.execute("SELECT id FROM PRODUCTS WHERE part_number = ?", (item_code,))
@@ -126,13 +152,29 @@ class ImportService:
                 inv = cur.fetchone()
                 if inv is None:
                     cur.execute(
-                        "INSERT INTO INVENTORY (product_id, current_stock, last_updated) VALUES (?, ?, ?)",
-                        (product_id, stock_val, datetime.now().isoformat())
+                        """INSERT INTO INVENTORY (
+                            product_id, current_stock, purc_orders_pending, sale_orders_due,
+                            nett_available, reorder_level, short_fall, min_reorder_qty,
+                            order_to_be_placed, last_updated
+                           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            product_id, stock_val, purc_val, sales_val,
+                            nett_val, reorder_val, shortfall_val, min_reorder_val,
+                            order_to_place_val, datetime.now().isoformat()
+                        )
                     )
                 else:
                     cur.execute(
-                        "UPDATE INVENTORY SET current_stock = ?, last_updated = ? WHERE product_id = ?",
-                        (stock_val, datetime.now().isoformat(), product_id)
+                        """UPDATE INVENTORY SET 
+                            current_stock = ?, purc_orders_pending = ?, sale_orders_due = ?,
+                            nett_available = ?, reorder_level = ?, short_fall = ?, min_reorder_qty = ?,
+                            order_to_be_placed = ?, last_updated = ? 
+                           WHERE product_id = ?""",
+                        (
+                            stock_val, purc_val, sales_val,
+                            nett_val, reorder_val, shortfall_val, min_reorder_val,
+                            order_to_place_val, datetime.now().isoformat(), product_id
+                        )
                     )
                 
                 cur.execute(f"RELEASE SAVEPOINT {savepoint_name};")
@@ -163,6 +205,41 @@ class ImportService:
             "failed_records": failed_records,
             "errors": errors[:50]
         }
+
+    @classmethod
+    def sync_from_web_url(cls, url, imported_by='Auto Sync'):
+        """Downloads an Excel spreadsheet from a remote web URL and imports it in-memory."""
+        import urllib.request
+        from io import BytesIO
+        
+        url_clean = url.strip()
+        if "docs.google.com/spreadsheets" in url_clean and "/edit" in url_clean:
+            url_clean = url_clean.split("/edit")[0] + "/export?format=xlsx"
+            
+        try:
+            req = urllib.request.Request(
+                url_clean, 
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            )
+            with urllib.request.urlopen(req, timeout=15) as response:
+                content = response.read()
+                
+            file_stream = BytesIO(content)
+            result = cls.import_inventory(
+                file_stream, 
+                sheet_name='Stock Group Reorder Status', 
+                filename='google_sheets.xlsx', 
+                imported_by=imported_by
+            )
+            return result
+        except Exception as e:
+            return {
+                "status": "failed",
+                "total_records": 0,
+                "successful_records": 0,
+                "failed_records": 0,
+                "errors": [f"Web fetch failed: {str(e)}"]
+            }
 
     @classmethod
     def import_costs(cls, file_path, sheet_name='PRICE LIST', filename='uploaded_file.xlsx', imported_by=None):

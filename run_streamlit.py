@@ -423,6 +423,43 @@ if "last_invoice_generated" not in st.session_state:
 if "last_quotation_generated" not in st.session_state:
     st.session_state.last_quotation_generated = None
 
+# --- 24/7 BACKGROUND EXCEL AUTO-SYNC DAEMON ---
+if not hasattr(st, "_background_sync_thread_started"):
+    st._background_sync_thread_started = True
+    import threading
+    import time
+    
+    def sync_loop():
+        while True:
+            try:
+                from app.models.database import get_db_connection
+                conn = get_db_connection()
+                cur = conn.cursor()
+                cur.execute("SELECT key, value FROM APP_SETTINGS WHERE key IN ('stock_excel_url', 'auto_sync_interval', 'auto_sync_enabled')")
+                rows = cur.fetchall()
+                conn.close()
+                
+                settings = {r['key']: r['value'] for r in rows}
+                url = settings.get('stock_excel_url')
+                interval = 15.0
+                try:
+                    interval = float(settings.get('auto_sync_interval', 15.0))
+                except:
+                    pass
+                enabled = settings.get('auto_sync_enabled', '0') == '1'
+                
+                if enabled and url and url.strip():
+                    from app.services.import_service import ImportService
+                    ImportService.sync_from_web_url(url, imported_by="24/7 Daemon Sync")
+                
+                time.sleep(max(60, interval * 60))
+            except Exception:
+                time.sleep(60)
+
+    t = threading.Thread(target=sync_loop, daemon=True, name="StockExcelBackgroundSync")
+    t.start()
+
+
 # --- TAB: DASHBOARD ---
 with t_dash:
     # Fetch statistics
@@ -550,82 +587,131 @@ with t_catalog:
 
 # --- TAB: AVAILABLE INVENTORY ---
 with t_inventory:
-    st.markdown("### 🔍 Real-Time Available Stock")
+    st.markdown("### 🔍 Stock Group Reorder Status & Inventory")
+    
+    settings = OrderService.get_settings()
+    excel_url = settings.get('stock_excel_url', '')
+    sync_enabled = settings.get('auto_sync_enabled', '0') == '1'
     
     # 1. Fetch available stock KPIs
     stock_stats = query_db(
         """SELECT 
              COUNT(CASE WHEN current_stock > 0 THEN 1 END) as active_skus,
              SUM(CASE WHEN current_stock > 0 THEN current_stock ELSE 0 END) as total_stock,
+             COUNT(CASE WHEN short_fall > 0 THEN 1 END) as shortfall_skus,
              SUM(CASE WHEN current_stock > 0 THEN current_stock * (COALESCE(c.price_per_100_pcs, 0) / 100.0) ELSE 0 END) as total_value
            FROM INVENTORY i
            LEFT JOIN PRODUCT_COSTS c ON i.product_id = c.product_id AND c.is_current = 1""",
         one=True
     )
     
+    # Sync status header
+    if excel_url:
+        st.caption(f"☁️ Cloud Excel Sync: Linked to `{excel_url[:70]}...` (Auto-Sync: {'ON' if sync_enabled else 'OFF'})")
+    else:
+        st.caption("⚠️ No Cloud Excel Sync linked. Setup in settings to update inventory automatically.")
+        
     # KPIs layout
-    col_st1, col_st2, col_st3 = st.columns(3)
+    col_st1, col_st2, col_st3, col_st4 = st.columns(4)
     with col_st1:
-        draw_metric_card("Active Stocked SKUs", f"{stock_stats['active_skus'] or 0:,}", "Items with stock > 0", "fa-solid fa-boxes-stacked")
+        draw_metric_card("Stocked SKUs", f"{stock_stats['active_skus'] or 0:,}", "Items with stock > 0", "fa-solid fa-boxes-stacked")
     with col_st2:
-        draw_metric_card("Total Stock Quantity", f"{int(stock_stats['total_stock'] or 0):,} pcs", "Sum of current stock levels", "fa-solid fa-layer-group")
+        draw_metric_card("Total Stock", f"{int(stock_stats['total_stock'] or 0):,} pcs", "Total pieces in warehouse", "fa-solid fa-layer-group")
     with col_st3:
-        draw_metric_card("Total Asset Value", f"₹{stock_stats['total_value'] or 0:,.2f}", "Calculated via current cost rates", "fa-solid fa-indian-rupee-sign")
+        draw_metric_card("Shortfall Items", f"{stock_stats['shortfall_skus'] or 0:,}", "SKUs below reorder level", "fa-solid fa-triangle-exclamation")
+    with col_st4:
+        draw_metric_card("Asset Value", f"₹{stock_stats['total_value'] or 0:,.2f}", "Calculated via current cost rates", "fa-solid fa-indian-rupee-sign")
         
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # 2. Search & List stocked items
-    q_inv_search = st.text_input("Search Available Stock (Part Number, Make, Series)", placeholder="e.g. 206-118", key="inv_stock_search_input")
+    # 2. Search & Filters
+    col_inv_s1, col_inv_s2 = st.columns([2, 1])
+    with col_inv_s1:
+        q_inv_search = st.text_input("Search Inventory (Part Number, Make, Series)", placeholder="e.g. 206-118", key="inv_stock_search_input")
+    with col_inv_s2:
+        filter_status = st.selectbox("Stock Level Filter", ["Show All", "Stocked Only (>0)", "Below Reorder Level (Shortfall)"])
+        
+    # Build query
+    sql = """SELECT p.part_number, p.part_name, p.make, p.series, i.*, c.price_per_100_pcs 
+             FROM INVENTORY i
+             JOIN PRODUCTS p ON i.product_id = p.id
+             LEFT JOIN PRODUCT_COSTS c ON p.id = c.product_id AND c.is_current = 1
+             WHERE 1=1"""
+    params = []
     
-    # Base query for only items with stock > 0
     if q_inv_search:
         search_str = f"%{q_inv_search.strip()}%"
-        stocked_items = query_db(
-            """SELECT p.*, i.current_stock, c.price_per_100_pcs 
-               FROM PRODUCTS p
-               JOIN INVENTORY i ON p.id = i.product_id
-               LEFT JOIN PRODUCT_COSTS c ON p.id = c.product_id AND c.is_current = 1
-               WHERE i.current_stock > 0 AND (p.part_number LIKE ? OR p.part_name LIKE ? OR p.make LIKE ? OR p.series LIKE ?)
-               ORDER BY i.current_stock DESC, p.part_number ASC LIMIT 100""",
-            (search_str, search_str, search_str, search_str)
-        )
-    else:
-        stocked_items = query_db(
-            """SELECT p.*, i.current_stock, c.price_per_100_pcs 
-               FROM PRODUCTS p
-               JOIN INVENTORY i ON p.id = i.product_id
-               LEFT JOIN PRODUCT_COSTS c ON p.id = c.product_id AND c.is_current = 1
-               WHERE i.current_stock > 0
-               ORDER BY i.current_stock DESC, p.part_number ASC LIMIT 100"""
-        )
+        sql += " AND (p.part_number LIKE ? OR p.part_name LIKE ? OR p.make LIKE ? OR p.series LIKE ?)"
+        params.extend([search_str, search_str, search_str, search_str])
         
+    if filter_status == "Stocked Only (>0)":
+        sql += " AND i.current_stock > 0"
+    elif filter_status == "Below Reorder Level (Shortfall)":
+        sql += " AND i.short_fall > 0"
+        
+    sql += " ORDER BY i.short_fall DESC, i.current_stock DESC, p.part_number ASC LIMIT 250"
+    
+    stocked_items = query_db(sql, tuple(params))
+    
     if len(stocked_items) == 0:
-        st.info("No available stock found matching your search.")
+        st.info("No stock records found matching your filters.")
     else:
-        # Build list data
         st.markdown('<div class="panel">', unsafe_allow_html=True)
         inv_rows = ""
         for p in stocked_items:
-            stock = p['current_stock']
-            price_100 = p['price_per_100_pcs'] or 0.0
-            val_inr = stock * (price_100 / 100.0)
+            stock = p['current_stock'] or 0.0
+            purc = p['purc_orders_pending'] or 0.0
+            sales = p['sale_orders_due'] or 0.0
+            nett = p['nett_available'] or 0.0
+            reorder = p['reorder_level'] or 0.0
+            shortfall = p['short_fall'] or 0.0
+            min_reorder = p['min_reorder_qty'] or 0.0
+            order_to_place = p['order_to_be_placed'] or 0.0
             
-            # Badge styles based on stock level
-            badge_class = "badge-green" if stock >= 100 else "badge-amber"
-            
-            inv_rows += f"<tr><td><strong>{p['part_number']}</strong></td><td>{p['part_name'] or p['part_number']}</td><td>{p['make'] or 'WAGO'}</td><td>{p['series'] or '-'}</td><td><span class=\"badge {badge_class}\">{int(stock)} pcs</span></td><td>₹{price_100:.2f}/100</td><td><strong>₹{val_inr:,.2f}</strong></td></tr>"
+            # Badge style for shortfall
+            if shortfall > 0:
+                shortfall_cell = f"<span class='badge badge-red' style='font-weight:bold;'>{int(shortfall)} pcs</span>"
+            else:
+                shortfall_cell = "<span class='badge badge-green'>0</span>"
+                
+            # Badge style for Order to be Placed
+            if order_to_place > 0:
+                order_cell = f"<strong style='color:#f87171;'>{int(order_to_place)} pcs</strong>"
+            else:
+                order_cell = "<span style='color:#a1a1aa;'>-</span>"
+                
+            # Formatting stock badge
+            stock_badge = "badge-green" if stock >= reorder else "badge-amber"
+            if stock == 0:
+                stock_badge = "badge-red"
+                
+            inv_rows += f"""
+            <tr>
+                <td><strong>{p['part_number']}</strong></td>
+                <td><span class="badge {stock_badge}">{int(stock)} pcs</span></td>
+                <td>{int(purc)}</td>
+                <td>{int(sales)}</td>
+                <td><strong>{int(nett)}</strong></td>
+                <td>{int(reorder)}</td>
+                <td>{shortfall_cell}</td>
+                <td>{int(min_reorder)}</td>
+                <td>{order_cell}</td>
+            </tr>
+            """
             
         render_html(f"""
         <table class="data-table">
             <thead>
                 <tr>
-                    <th>Part Number</th>
-                    <th>Description</th>
-                    <th>Make</th>
-                    <th>Series</th>
-                    <th>Current Stock</th>
-                    <th>Price List Rate</th>
-                    <th>Stock Asset Value</th>
+                    <th>Item Code</th>
+                    <th>Closing Stock</th>
+                    <th>Purc Pending</th>
+                    <th>Sale Due</th>
+                    <th>Nett Available</th>
+                    <th>Re-order Level</th>
+                    <th>Short fall</th>
+                    <th>Min Reorder</th>
+                    <th>Order Placed</th>
                 </tr>
             </thead>
             <tbody>
@@ -1614,14 +1700,46 @@ with t_manual:
 
 # --- TAB: SETTINGS ---
 with t_settings:
-    st.markdown("### System Tax Configurations")
+    st.markdown("### ⚙️ System Configurations")
     
     settings = OrderService.get_settings()
     current_gst = float(settings.get('gst_rate', 18.0))
+    current_url = settings.get('stock_excel_url', '')
+    current_sync_enabled = settings.get('auto_sync_enabled', '0') == '1'
+    current_interval = float(settings.get('auto_sync_interval', 15.0))
     
+    st.subheader("1. General Configurations")
     new_gst_rate = st.number_input("Default GST Percentage (%)", min_value=0.0, max_value=100.0, step=0.1, value=current_gst)
     
-    if st.button("Apply Config Settings"):
-        execute_db("INSERT OR REPLACE INTO APP_SETTINGS (key, value) VALUES ('gst_rate', ?)", (str(new_gst_rate),))
-        trigger_toast("Settings updated successfully!", icon="⚙️")
-        st.rerun()
+    st.subheader("2. Stock Group Reorder Excel Cloud Sync")
+    st.write("Link your local Stock Group Reorder Excel file. Upload it to Google Drive/OneDrive, share as 'Anyone with link can view', and paste the URL below.")
+    
+    new_url = st.text_input("Excel / Google Sheets Share URL", value=current_url, placeholder="https://docs.google.com/spreadsheets/d/...")
+    new_sync_enabled = st.checkbox("Enable 24/7 Background Auto-Sync", value=current_sync_enabled)
+    new_interval = st.number_input("Auto-Sync Interval (Minutes)", min_value=1.0, max_value=1440.0, step=1.0, value=current_interval)
+    
+    col_set1, col_set2 = st.columns([1, 1])
+    with col_set1:
+        if st.button("Apply Config Settings", type="primary", use_container_width=True):
+            execute_db("INSERT OR REPLACE INTO APP_SETTINGS (key, value) VALUES ('gst_rate', ?)", (str(new_gst_rate),))
+            execute_db("INSERT OR REPLACE INTO APP_SETTINGS (key, value) VALUES ('stock_excel_url', ?)", (str(new_url),))
+            execute_db("INSERT OR REPLACE INTO APP_SETTINGS (key, value) VALUES ('auto_sync_enabled', ?)", ('1' if new_sync_enabled else '0',))
+            execute_db("INSERT OR REPLACE INTO APP_SETTINGS (key, value) VALUES ('auto_sync_interval', ?)", (str(new_interval),))
+            trigger_toast("Settings updated successfully!", icon="⚙️")
+            st.rerun()
+            
+    with col_set2:
+        if st.button("Sync Stock Status Now", use_container_width=True):
+            if not new_url.strip():
+                st.error("Please configure a valid Excel Share URL first.")
+            else:
+                with st.spinner("Downloading and parsing Excel sheet from cloud..."):
+                    res = ImportService.sync_from_web_url(new_url.strip(), imported_by="Manual Admin Sync")
+                    if res['status'] in ('success', 'partial_success'):
+                        msg = f"Stock status synced successfully! Loaded {res['successful_records']} rows."
+                        if res['failed_records'] > 0:
+                            msg += f" ({res['failed_records']} rows failed)"
+                        trigger_toast(msg, icon="🔄")
+                        st.rerun()
+                    else:
+                        st.error(f"Sync failed: {', '.join(res['errors'])}")

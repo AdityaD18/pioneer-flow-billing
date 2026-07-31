@@ -253,6 +253,49 @@ class TestInvoiceSystem(unittest.TestCase):
         self.assertGreaterEqual(len(qtn_list), 1)
         print("Success: Verified quotation creation, pricing calculation overrides, and history retrieval.")
 
+    def test_f_excel_reorder_status_sync(self):
+        print("\n=== Testing Stock Group Reorder Excel Sync ===")
+        
+        cursor = g._database.cursor()
+        cursor.execute("PRAGMA table_info(INVENTORY)")
+        columns = [col[1] for col in cursor.fetchall()]
+        
+        self.assertIn("purc_orders_pending", columns)
+        self.assertIn("sale_orders_due", columns)
+        self.assertIn("nett_available", columns)
+        self.assertIn("reorder_level", columns)
+        self.assertIn("short_fall", columns)
+        self.assertIn("min_reorder_qty", columns)
+        self.assertIn("order_to_be_placed", columns)
+        
+        excel_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'group order status.xlsx'))
+        
+        res = ImportService.import_inventory(excel_path)
+        self.assertEqual(res['status'], 'success')
+        self.assertGreater(res['successful_records'], 0)
+        
+        sample = query_db(
+            """SELECT i.*, p.part_number 
+               FROM INVENTORY i
+               JOIN PRODUCTS p ON i.product_id = p.id
+               WHERE i.purc_orders_pending > 0 OR i.sale_orders_due > 0 
+               LIMIT 1""", one=True
+        )
+        if sample:
+            print(f"Sample Synced Stock - Part Number: {sample['part_number']}")
+            print(f"  Closing Stock: {sample['current_stock']} | Purc Pending: {sample['purc_orders_pending']}")
+            print(f"  Sale Due: {sample['sale_orders_due']} | Nett Available: {sample['nett_available']}")
+            print(f"  Reorder Level: {sample['reorder_level']} | Shortfall: {sample['short_fall']}")
+            print(f"  Order Placed Recommendation: {sample['order_to_be_placed']}")
+            
+            expected_nett = sample['current_stock'] + sample['purc_orders_pending'] - sample['sale_orders_due']
+            self.assertEqual(sample['nett_available'], expected_nett)
+            
+            expected_shortfall = max(0.0, sample['reorder_level'] - sample['nett_available'])
+            self.assertEqual(sample['short_fall'], expected_shortfall)
+            
+        print("Success: Verified reorder status schema columns, parsing rules, and math logic.")
+
 # Helper queries
 def query_db(query, args=(), one=False):
     cur = g._database.cursor()

@@ -21,6 +21,25 @@ def init_db():
     
     conn.executescript(schema_sql)
     
+    # Run migrations for INVENTORY table if new columns are missing
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(INVENTORY)")
+    columns = [col[1] for col in cursor.fetchall()]
+    
+    new_cols = {
+        "purc_orders_pending": "REAL DEFAULT 0",
+        "sale_orders_due": "REAL DEFAULT 0",
+        "nett_available": "REAL DEFAULT 0",
+        "reorder_level": "REAL DEFAULT 0",
+        "short_fall": "REAL DEFAULT 0",
+        "min_reorder_qty": "REAL DEFAULT 0",
+        "order_to_be_placed": "REAL DEFAULT 0"
+    }
+    
+    for col_name, col_type in new_cols.items():
+        if col_name not in columns:
+            cursor.execute(f"ALTER TABLE INVENTORY ADD COLUMN {col_name} {col_type};")
+    
     # Seed 1 Demo Customer
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM CUSTOMERS")
