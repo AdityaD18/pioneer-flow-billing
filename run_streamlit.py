@@ -200,6 +200,13 @@ def draw_metric_card(label, value, footer_text=None, icon_class="fa-solid fa-cha
 
 def generate_invoice_html(invoice_data):
     """Generates the clean printable tax invoice HTML with direct styles embedded."""
+    # Safety mapping for quotations to prevent KeyError
+    if 'invoice_number' not in invoice_data:
+        invoice_data['invoice_number'] = invoice_data.get('quotation_number', '')
+    if 'invoice_date' not in invoice_data:
+        c_at = invoice_data.get('created_at', '')
+        invoice_data['invoice_date'] = c_at[:10] if len(c_at) >= 10 else c_at
+
     order = invoice_data['order']
     subtotal = order['subtotal']
     gst_rate = order['gst_rate']
