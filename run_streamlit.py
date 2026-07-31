@@ -820,6 +820,9 @@ with t_invoice:
                ORDER BY p.part_number ASC"""
         )
         
+        if "inv_grid_reset_counter" not in st.session_state:
+            st.session_state.inv_grid_reset_counter = 0
+            
         # We present an editable grid
         if "inv_bulk_input_df" not in st.session_state:
             st.session_state.inv_bulk_input_df = pd.DataFrame(
@@ -835,7 +838,7 @@ with t_invoice:
                 "Quantity": st.column_config.NumberColumn("Quantity (PCS)", min_value=1, step=1)
             },
             use_container_width=True,
-            key="bulk_inv_data_editor"
+            key=f"bulk_inv_data_editor_{st.session_state.inv_grid_reset_counter}"
         )
         
         # Add buttons to process grid
@@ -914,7 +917,8 @@ with t_invoice:
                         if registered_count > 0:
                             msg += f" (Registered {registered_count} new parts with 0 cost)"
                         # Clear input grid state
-                        st.session_state.pop("bulk_inv_data_editor", None)
+                        st.session_state.pop(f"bulk_inv_data_editor_{st.session_state.inv_grid_reset_counter}", None)
+                        st.session_state.inv_grid_reset_counter += 1
                         st.session_state.inv_bulk_input_df = pd.DataFrame(
                             [{"Part Number": "", "Quantity": 1}],
                             columns=["Part Number", "Quantity"]
@@ -923,7 +927,8 @@ with t_invoice:
                         st.rerun()
         with col_grid_btn2:
             if st.button("Clear Grid Editor", use_container_width=True, key="clear_inv_grid_btn"):
-                st.session_state.pop("bulk_inv_data_editor", None)
+                st.session_state.pop(f"bulk_inv_data_editor_{st.session_state.inv_grid_reset_counter}", None)
+                st.session_state.inv_grid_reset_counter += 1
                 st.session_state.inv_bulk_input_df = pd.DataFrame(
                     [{"Part Number": "", "Quantity": 1}],
                     columns=["Part Number", "Quantity"]
@@ -1156,6 +1161,9 @@ with t_quotation:
                ORDER BY p.part_number ASC"""
         )
         
+        if "qtn_grid_reset_counter" not in st.session_state:
+            st.session_state.qtn_grid_reset_counter = 0
+
         # We present an editable grid
         if "qtn_bulk_input_df" not in st.session_state:
             st.session_state.qtn_bulk_input_df = pd.DataFrame(
@@ -1171,7 +1179,7 @@ with t_quotation:
                 "Quantity": st.column_config.NumberColumn("Quantity (PCS)", min_value=1, step=1)
             },
             use_container_width=True,
-            key="bulk_qtn_data_editor"
+            key=f"bulk_qtn_data_editor_{st.session_state.qtn_grid_reset_counter}"
         )
         
         # Add buttons to process grid
@@ -1250,7 +1258,8 @@ with t_quotation:
                         if registered_count > 0:
                             msg += f" (Registered {registered_count} new parts with 0 cost)"
                         # Clear input grid state
-                        st.session_state.pop("bulk_qtn_data_editor", None)
+                        st.session_state.pop(f"bulk_qtn_data_editor_{st.session_state.qtn_grid_reset_counter}", None)
+                        st.session_state.qtn_grid_reset_counter += 1
                         st.session_state.qtn_bulk_input_df = pd.DataFrame(
                             [{"Part Number": "", "Quantity": 1}],
                             columns=["Part Number", "Quantity"]
@@ -1259,7 +1268,8 @@ with t_quotation:
                         st.rerun()
         with col_q_grid_btn2:
             if st.button("Clear Grid Editor", use_container_width=True, key="clear_qtn_grid_btn"):
-                st.session_state.pop("bulk_qtn_data_editor", None)
+                st.session_state.pop(f"bulk_qtn_data_editor_{st.session_state.qtn_grid_reset_counter}", None)
+                st.session_state.qtn_grid_reset_counter += 1
                 st.session_state.qtn_bulk_input_df = pd.DataFrame(
                     [{"Part Number": "", "Quantity": 1}],
                     columns=["Part Number", "Quantity"]
