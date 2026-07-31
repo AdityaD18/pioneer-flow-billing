@@ -783,7 +783,7 @@ with t_invoice:
             num_rows="dynamic",
             column_config={
                 "Part Number": st.column_config.TextColumn("Part Number / Item Code", width="medium"),
-                "Quantity": st.column_config.NumberColumn("Quantity (PCS)", min_value=1, value=1, step=1)
+                "Quantity": st.column_config.NumberColumn("Quantity (PCS)", min_value=1, step=1)
             },
             use_container_width=True,
             key="bulk_inv_data_editor"
@@ -1117,7 +1117,7 @@ with t_quotation:
             num_rows="dynamic",
             column_config={
                 "Part Number": st.column_config.TextColumn("Part Number / Item Code", width="medium"),
-                "Quantity": st.column_config.NumberColumn("Quantity (PCS)", min_value=1, value=1, step=1)
+                "Quantity": st.column_config.NumberColumn("Quantity (PCS)", min_value=1, step=1)
             },
             use_container_width=True,
             key="bulk_qtn_data_editor"
