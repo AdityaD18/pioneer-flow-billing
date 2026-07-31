@@ -914,6 +914,7 @@ with t_invoice:
                         if registered_count > 0:
                             msg += f" (Registered {registered_count} new parts with 0 cost)"
                         # Clear input grid state
+                        st.session_state.pop("bulk_inv_data_editor", None)
                         st.session_state.inv_bulk_input_df = pd.DataFrame(
                             [{"Part Number": "", "Quantity": 1}],
                             columns=["Part Number", "Quantity"]
@@ -922,6 +923,7 @@ with t_invoice:
                         st.rerun()
         with col_grid_btn2:
             if st.button("Clear Grid Editor", use_container_width=True, key="clear_inv_grid_btn"):
+                st.session_state.pop("bulk_inv_data_editor", None)
                 st.session_state.inv_bulk_input_df = pd.DataFrame(
                     [{"Part Number": "", "Quantity": 1}],
                     columns=["Part Number", "Quantity"]
@@ -1248,6 +1250,7 @@ with t_quotation:
                         if registered_count > 0:
                             msg += f" (Registered {registered_count} new parts with 0 cost)"
                         # Clear input grid state
+                        st.session_state.pop("bulk_qtn_data_editor", None)
                         st.session_state.qtn_bulk_input_df = pd.DataFrame(
                             [{"Part Number": "", "Quantity": 1}],
                             columns=["Part Number", "Quantity"]
@@ -1256,6 +1259,7 @@ with t_quotation:
                         st.rerun()
         with col_q_grid_btn2:
             if st.button("Clear Grid Editor", use_container_width=True, key="clear_qtn_grid_btn"):
+                st.session_state.pop("bulk_qtn_data_editor", None)
                 st.session_state.qtn_bulk_input_df = pd.DataFrame(
                     [{"Part Number": "", "Quantity": 1}],
                     columns=["Part Number", "Quantity"]
