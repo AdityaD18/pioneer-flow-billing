@@ -372,13 +372,14 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 5. Core Navigation Tabs
-t_dash, t_imports, t_catalog, t_customers, t_invoice, t_history, t_settings = st.tabs([
+t_dash, t_imports, t_catalog, t_customers, t_invoice, t_history, t_manual, t_settings = st.tabs([
     "📊 Dashboard", 
     "📁 Import Sheets", 
     "📦 Product Catalog", 
     "👥 Customers", 
     "📝 New Invoice", 
     "📜 Invoice History",
+    "➕ Manual Entry",
     "⚙️ Settings"
 ])
 
@@ -749,71 +750,45 @@ with t_customers:
 with t_invoice:
     st.markdown("### Interactive Invoice Generator")
     
-    # Grid: Customer configuration and Part addition
-    col_c1, col_c2 = st.columns([2, 1])
+    # Left column for Item additions (Catalog Item Details)
+    # Right column for Customer & Billing Details + Totals (Live totals & settings)
+    col_left, col_right = st.columns([1.2, 1])
     
-    with col_c1:
-        st.subheader("1. Customer details")
-        customers = CustomerService.get_customers()
-        cust_names = ["- Create New Inline -"] + [c['name'] for c in customers]
+    with col_left:
+        st.subheader("1. Catalog item details")
         
-        selected_cust_name = st.selectbox("Search / Select Active Billing Profile", cust_names)
-        
-        # Resolve customer details
-        cust_profile = None
-        if selected_cust_name != "- Create New Inline -":
-            cust_profile = CustomerService.get_customer_by_name(selected_cust_name)
+        # Load all products for merged search & lookup selectbox
+        all_prods = query_db(
+            """SELECT p.*, i.current_stock, c.price_per_100_pcs 
+               FROM PRODUCTS p
+               LEFT JOIN INVENTORY i ON p.id = i.product_id
+               LEFT JOIN PRODUCT_COSTS c ON p.id = c.product_id AND c.is_current = 1
+               ORDER BY p.part_number ASC"""
+        )
+        prod_options = ["- Search & Select Part -"]
+        prod_map = {}
+        for p in all_prods:
+            stock_val = p['current_stock'] if p['current_stock'] is not None else 0.0
+            price_val = p['price_per_100_pcs'] if p['price_per_100_pcs'] is not None else 0.0
+            label = f"{p['part_number']} | {p['make']} (Stock: {stock_val}, Price: ₹{price_val}/100)"
+            prod_options.append(label)
+            prod_map[label] = p
             
-        col_c_in1, col_c_in2 = st.columns(2)
-        with col_c_in1:
-            billing_name = st.text_input("Billing Name *", value=cust_profile['name'] if cust_profile else "", disabled=(cust_profile is not None))
-            billing_discount = st.number_input("Discount Profile (%)", min_value=0.0, max_value=100.0, step=0.01, value=cust_profile['discount_percentage'] if cust_profile else 0.0)
-        with col_c_in2:
-            billing_gst = st.text_input("GSTIN Snapshot", value=(cust_profile['gst_number'] or "") if cust_profile else "")
-            billing_terms = st.text_input("Payment Terms Snapshot", value=(cust_profile['payment_terms'] or "") if cust_profile else "", placeholder="e.g. Net 30 Days")
-            
-        st.subheader("2. Catalog item details")
-        
-        # Product autocomplete helper
-        prod_search = st.text_input("Search catalog parts (Item Code, Name, Make)", key="search_query")
-        
-        if prod_search:
-            search_str = f"%{prod_search.strip()}%"
-            matched_prods = query_db(
-                """SELECT p.*, i.current_stock, c.price_per_100_pcs 
-                   FROM PRODUCTS p
-                   LEFT JOIN INVENTORY i ON p.id = i.product_id
-                   LEFT JOIN PRODUCT_COSTS c ON p.id = c.product_id AND c.is_current = 1
-                   WHERE p.part_number LIKE ? OR p.part_name LIKE ? OR p.make LIKE ? OR p.series LIKE ?
-                   ORDER BY p.part_number ASC LIMIT 100""",
-                (search_str, search_str, search_str, search_str)
-            )
-        else:
-            matched_prods = query_db(
-                """SELECT p.*, i.current_stock, c.price_per_100_pcs 
-                   FROM PRODUCTS p
-                   LEFT JOIN INVENTORY i ON p.id = i.product_id
-                   LEFT JOIN PRODUCT_COSTS c ON p.id = c.product_id AND c.is_current = 1
-                   ORDER BY p.part_number ASC LIMIT 30"""
-            )
-            
-        prod_options = ["- Select Part -"] + [f"{p['part_number']} (Stock: {p['current_stock'] or 0.0}, Price: ₹{p['price_per_100_pcs'] or 0.0})" for p in matched_prods]
-        selected_prod_str = st.selectbox("Pick Part from Lookup list", prod_options)
+        selected_prod_label = st.selectbox("Search & Select Part (Type Part Number or Make)", prod_options, key="inv_part_select")
         
         selected_prod = None
-        if selected_prod_str != "- Select Part -":
-            selected_idx = prod_options.index(selected_prod_str) - 1
-            selected_prod = matched_prods[selected_idx]
+        if selected_prod_label != "- Search & Select Part -":
+            selected_prod = prod_map[selected_prod_label]
             
         col_add1, col_add2, col_add3 = st.columns([1, 1, 1])
         with col_add1:
-            item_qty = st.number_input("Item Quantity", min_value=1, value=1)
+            item_qty = st.number_input("Item Quantity", min_value=1, value=1, key="inv_item_qty")
         with col_add2:
-            item_disc_str = st.text_input("Custom Discount % (Blank = Default)", "")
+            item_disc_str = st.text_input("Custom Discount % (Blank = Default)", "", key="inv_item_disc")
         with col_add3:
             st.write(" ") # spacer
             st.write(" ") # spacer
-            if st.button("Add Item to Invoice Draft", use_container_width=True):
+            if st.button("Add Item to Invoice Draft", use_container_width=True, key="inv_add_item_btn"):
                 if selected_prod is None:
                     st.error("Please select a product first.")
                 else:
@@ -828,7 +803,6 @@ with t_invoice:
                             custom_disc = None
                             
                     # Add to session list
-                    # Find if already exists
                     found = False
                     for i in st.session_state.invoice_items:
                         if i['product_id'] == selected_prod['id']:
@@ -849,10 +823,28 @@ with t_invoice:
                         })
                     st.success(f"Added product {selected_prod['part_number']}!")
                     st.rerun()
-
-    with col_c2:
-        st.subheader("3. Live totals & settings")
-        inv_date = st.date_input("Billing Date", datetime.now())
+                    
+    with col_right:
+        st.subheader("2. Customer & billing details")
+        customers = CustomerService.get_customers()
+        cust_names = ["- Create New Inline -"] + [c['name'] for c in customers]
+        
+        # Select active profile
+        selected_cust_name = st.selectbox("Search / Select Active Billing Profile", cust_names, key="inv_cust_select")
+        
+        cust_profile = None
+        if selected_cust_name != "- Create New Inline -":
+            cust_profile = CustomerService.get_customer_by_name(selected_cust_name)
+            
+        col_c_in1, col_c_in2 = st.columns(2)
+        with col_c_in1:
+            billing_name = st.text_input("Billing Name *", value=cust_profile['name'] if cust_profile else "", disabled=(cust_profile is not None), key="inv_billing_name")
+            billing_discount = st.number_input("Discount Profile (%)", min_value=0.0, max_value=100.0, step=0.01, value=cust_profile['discount_percentage'] if cust_profile else 0.0, key="inv_billing_discount")
+        with col_c_in2:
+            billing_gst = st.text_input("GSTIN Snapshot", value=(cust_profile['gst_number'] or "") if cust_profile else "", key="inv_billing_gst")
+            billing_terms = st.text_input("Payment Terms Snapshot", value=(cust_profile['payment_terms'] or "") if cust_profile else "", placeholder="e.g. Net 30 Days", key="inv_billing_terms")
+            
+        inv_date = st.date_input("Billing Date", datetime.now(), key="inv_date_input")
         
         # Calculate
         cust_payload = {
@@ -862,6 +854,7 @@ with t_invoice:
             "payment_terms": billing_terms
         }
         
+        st.subheader("3. Live totals & actions")
         if len(st.session_state.invoice_items) == 0:
             st.markdown("""
             <div class="metric-card">
@@ -897,7 +890,7 @@ with t_invoice:
                         st.markdown(f"- **{item['part_number']}**: Required: {int(item['quantity'])}, Available: {int(item['current_stock'])}")
             
             # Generate Button
-            if st.button("Generate Invoice & Print", type="primary", use_container_width=True):
+            if st.button("Generate Invoice & Print", type="primary", use_container_width=True, key="inv_gen_btn"):
                 if not billing_name:
                     st.error("Customer name is required.")
                 else:
@@ -1078,6 +1071,98 @@ with t_history:
                 </tbody>
             </table>
             """, unsafe_allow_html=True)
+
+# --- TAB: MANUAL ENTRY ---
+with t_manual:
+    st.markdown("### Manual Database Entry")
+    
+    m_choice = st.radio("Choose Entry Type", ["Add New Product Catalog Entry", "Add New Customer Profile"], horizontal=True, key="manual_choice")
+    
+    if m_choice == "Add New Product Catalog Entry":
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.subheader("➕ Add Product to Catalog")
+        
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            m_part = st.text_input("Part Number / Item Code *", "", placeholder="e.g. 209-120", key="man_prod_part")
+            m_make = st.text_input("Make / Manufacturer *", "WAGO", key="man_prod_make")
+            m_name = st.text_input("Product Name / Description", "", key="man_prod_name")
+        with col_m2:
+            m_packing = st.number_input("Packing Quantity (PCS)", min_value=1, value=1, key="man_prod_pack")
+            m_stock = st.number_input("Initial Stock Quantity", min_value=0.0, step=1.0, value=0.0, key="man_prod_stock")
+            m_price = st.number_input("Cost Rate (INR per 100 pcs)", min_value=0.0, step=0.01, value=0.0, key="man_prod_price")
+            
+        if st.button("Save New Product Catalog Entry", type="primary", use_container_width=True, key="man_prod_save_btn"):
+            if not m_part.strip() or not m_make.strip():
+                st.error("Part Number and Make are mandatory fields.")
+            else:
+                conn = get_db_connection()
+                cur = conn.cursor()
+                try:
+                    cur.execute("BEGIN TRANSACTION;")
+                    
+                    # 1. Check if product already exists
+                    cur.execute("SELECT id FROM PRODUCTS WHERE part_number = ?", (m_part.strip(),))
+                    prod = cur.fetchone()
+                    
+                    if prod:
+                        st.error(f"Product '{m_part.strip()}' already exists in catalog. Use uploads to update, or enter a different Part Number.")
+                        cur.execute("ROLLBACK;")
+                    else:
+                        series = m_part.split('-')[0] if '-' in m_part else None
+                        cur.execute(
+                            "INSERT INTO PRODUCTS (part_number, part_name, series, make, packing_quantity) VALUES (?, ?, ?, ?, ?)",
+                            (m_part.strip(), m_name.strip() or m_part.strip(), series, m_make.strip(), m_packing)
+                        )
+                        product_id = cur.lastrowid
+                        
+                        # Add initial stock
+                        cur.execute(
+                            "INSERT INTO INVENTORY (product_id, current_stock, last_updated) VALUES (?, ?, ?)",
+                            (product_id, m_stock, datetime.now().isoformat())
+                        )
+                        
+                        # Add price list
+                        price_per_unit = m_price / 100.0
+                        cur.execute(
+                            "INSERT INTO PRODUCT_COSTS (product_id, price_per_100_pcs, price_per_unit, effective_from, is_current) VALUES (?, ?, ?, ?, ?)",
+                            (product_id, m_price, price_per_unit, datetime.now().isoformat(), 1)
+                        )
+                        
+                        cur.execute("COMMIT;")
+                        st.success(f"Product '{m_part.strip()}' successfully added to catalog and inventory!")
+                        st.rerun()
+                except Exception as ex:
+                    try: cur.execute("ROLLBACK;")
+                    except: pass
+                    st.error(f"Failed to add product: {str(ex)}")
+                finally:
+                    conn.close()
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+    else:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.subheader("➕ Add Customer Profile")
+        
+        col_mc1, col_mc2 = st.columns(2)
+        with col_mc1:
+            mc_name = st.text_input("Customer/Company Name *", "", key="man_cust_name")
+            mc_discount = st.number_input("Default Discount %", min_value=0.0, max_value=100.0, step=0.01, value=0.0, key="man_cust_disc")
+        with col_mc2:
+            mc_gst = st.text_input("GSTIN Number", "", key="man_cust_gst")
+            mc_terms = st.text_input("Payment Terms", placeholder="e.g. Net 30 Days", key="man_cust_terms")
+            
+        if st.button("Save New Customer Profile", type="primary", use_container_width=True, key="man_cust_save_btn"):
+            if not mc_name.strip():
+                st.error("Customer Company Name is mandatory.")
+            else:
+                try:
+                    CustomerService.create_customer(mc_name.strip(), mc_discount, mc_gst.strip() or None, mc_terms.strip() or None)
+                    st.success(f"Customer '{mc_name.strip()}' successfully registered!")
+                    st.rerun()
+                except ValueError as e:
+                    st.error(str(e))
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB: SETTINGS ---
 with t_settings:
