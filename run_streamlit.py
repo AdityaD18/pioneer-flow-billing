@@ -487,56 +487,46 @@ with t_dash:
 
 # --- TAB: IMPORTS ---
 with t_imports:
-    st.markdown("### Upload Combined Excel Workbook")
+    st.markdown("### Upload Annual Price List")
     
     st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.subheader("Import Combined Inventory & Cost Workbook")
-    st.write("Upload a single Excel workbook (.xlsx, .xls) containing both the stock inventory and cost sheets.")
+    st.subheader("Import Price List Sheet")
+    st.write("Upload the Excel workbook (.xlsx, .xls) containing the pricing list sheet. Note: Warehouse stock levels are auto-synchronized from your cloud Excel connection.")
     
-    combined_file = st.file_uploader("Select Pioneer Excel Workbook", type=["xlsx", "xls"], key="combined_file")
+    price_file = st.file_uploader("Select Price List Excel Workbook", type=["xlsx", "xls"], key="price_file")
     
-    col_sh1, col_sh2 = st.columns(2)
-    with col_sh1:
-        inv_sheet = st.text_input("Inventory Sheet Name", "Stock Group Reorder Status", key="inv_sheet")
-    with col_sh2:
-        cost_sheet = st.text_input("Price List Sheet Name", "PRICE LIST", key="cost_sheet")
+    cost_sheet = st.text_input("Price List Sheet Name", "PRICE LIST", key="cost_sheet")
         
-    if st.button("Run Complete Import & Synchronization", use_container_width=True, type="primary"):
-        if combined_file is None:
+    if st.button("Run Price List Import", use_container_width=True, type="primary"):
+        if price_file is None:
             st.error("Please upload an Excel workbook first.")
         else:
             # Save temp file
-            temp_path = os.path.join("uploads", combined_file.name)
+            temp_path = os.path.join("uploads", price_file.name)
             os.makedirs("uploads", exist_ok=True)
             with open(temp_path, "wb") as f:
-                f.write(combined_file.getvalue())
+                f.write(price_file.getvalue())
             
             # Progress tracking
             progress_bar = st.progress(0)
             status_text = st.empty()
             
-            # 1. Process Inventory
-            status_text.text("Importing stock inventory quantities...")
-            progress_bar.progress(25)
-            inv_res = ImportService.import_inventory(temp_path, sheet_name=inv_sheet, filename=combined_file.name)
-            
-            # 2. Process Costs
+            # Process Costs
             status_text.text("Importing product pricing lists...")
-            progress_bar.progress(60)
-            cost_res = ImportService.import_costs(temp_path, sheet_name=cost_sheet, filename=combined_file.name)
+            progress_bar.progress(50)
+            cost_res = ImportService.import_costs(temp_path, sheet_name=cost_sheet, filename=price_file.name)
             
             progress_bar.progress(100)
-            status_text.text("Import synchronization finished.")
+            status_text.text("Import finished.")
             
             # clean up temp file
             try: os.remove(temp_path)
             except: pass
             
-            if inv_res['status'] == 'failed' and cost_res['status'] == 'failed':
-                st.error("Excel upload failed. Please verify sheet names and column headers.")
+            if cost_res['status'] == 'failed':
+                st.error(f"Price list upload failed: {', '.join(cost_res['errors'])}")
             else:
-                total_success = inv_res['successful_records'] + cost_res['successful_records']
-                trigger_toast(f"Excel sync successful! Processed {total_success} items.", icon="✅")
+                trigger_toast(f"Price list sync successful! Loaded {cost_res['successful_records']} items.", icon="✅")
                 st.rerun()
             
     st.markdown('</div>', unsafe_allow_html=True)
