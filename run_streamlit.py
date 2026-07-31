@@ -228,8 +228,6 @@ def generate_invoice_html(invoice_data):
         <tr>
             <td>{idx + 1}</td>
             <td><strong>{item['part_number_snapshot']}</strong></td>
-            <td>WAGO</td>
-            <td>PCS</td>
             <td style="text-align: right;">{int(item['quantity'])}</td>
             <td style="text-align: right;">₹{item['unit_price']:.2f}</td>
             <td style="text-align: right;">{item['discount_percentage']:.1f}%</td>
@@ -319,10 +317,8 @@ def generate_invoice_html(invoice_data):
                     <tr>
                         <th>Sr No.</th>
                         <th>Part Number / Item Code</th>
-                        <th>Make</th>
-                        <th>Packing Qty</th>
                         <th style="text-align: right;">Qty</th>
-                        <th style="text-align: right;">Rate / 100 Pcs</th>
+                        <th style="text-align: right;">Rate / Pc</th>
                         <th style="text-align: right;">Dis. %</th>
                         <th style="text-align: right;">Net Value</th>
                     </tr>
@@ -1033,11 +1029,12 @@ with t_invoice:
         # Build pandas dataframe for the st.data_editor
         df_editor_data = []
         for idx, i in enumerate(st.session_state.invoice_items):
+            rate_pc = i.get('unit_price') or (i.get('unit_price_100', 0) / 100.0)
             df_editor_data.append({
                 "Part Number": i["part_number"],
                 "Available Stock": i["current_stock"],
                 "Quantity": i["quantity"],
-                "List Price/100": i["unit_price_100"],
+                "Rate / Pc (₹)": round(rate_pc, 2),
                 "Custom Disc %": i["discount_percentage"] if i["discount_percentage"] is not None else 0.0,
                 "Action": False # checkbox to remove
             })
@@ -1048,7 +1045,7 @@ with t_invoice:
             column_config={
                 "Part Number": st.column_config.TextColumn("Part Number", disabled=True),
                 "Available Stock": st.column_config.NumberColumn("Available Stock", disabled=True),
-                "List Price/100": st.column_config.NumberColumn("List Price/100", disabled=True),
+                "Rate / Pc (₹)": st.column_config.NumberColumn("Rate / Pc (₹)", disabled=True, format="₹%.2f"),
                 "Quantity": st.column_config.NumberColumn("Quantity", min_value=1, step=1),
                 "Custom Disc %": st.column_config.NumberColumn("Custom Disc %", min_value=0.0, max_value=100.0),
                 "Action": st.column_config.CheckboxColumn("Remove Item")
@@ -1130,6 +1127,7 @@ if hasattr(st, "dialog"):
             
             calc_item = calc['items'][idx] if idx < len(calc['items']) else None
             line_tot = calc_item['line_total'] if calc_item else 0.0
+            rate_pc = calc_item['unit_price'] if calc_item else (item.get('unit_price') or (item.get('unit_price_100', 0) / 100.0))
             
             grid_data.append({
                 "Item Code": part_num,
@@ -1142,7 +1140,7 @@ if hasattr(st, "dialog"):
                 "Min Reorder Qty": int(p_info['min_reorder_qty']) if p_info and p_info['min_reorder_qty'] is not None else 0,
                 "Order to be Placed": int(p_info['order_to_be_placed']) if p_info and p_info['order_to_be_placed'] is not None else 0,
                 "Qty Requested": int(item['quantity']),
-                "Price/100 (₹)": f"₹{item['unit_price_100']:.2f}",
+                "Rate / Pc (₹)": f"₹{rate_pc:.2f}",
                 "Line Total (₹)": f"₹{line_tot:.2f}"
             })
             
@@ -1415,11 +1413,12 @@ with t_quotation:
         # Build pandas dataframe for the st.data_editor
         df_editor_data = []
         for idx, i in enumerate(st.session_state.quotation_items):
+            rate_pc = i.get('unit_price') or (i.get('unit_price_100', 0) / 100.0)
             df_editor_data.append({
                 "Part Number": i["part_number"],
                 "Available Stock": i["current_stock"],
                 "Quantity": i["quantity"],
-                "List Price/100": i["unit_price_100"],
+                "Rate / Pc (₹)": round(rate_pc, 2),
                 "Custom Disc %": i["discount_percentage"] if i["discount_percentage"] is not None else 0.0,
                 "Action": False
             })
@@ -1430,7 +1429,7 @@ with t_quotation:
             column_config={
                 "Part Number": st.column_config.TextColumn("Part Number", disabled=True),
                 "Available Stock": st.column_config.NumberColumn("Available Stock", disabled=True),
-                "List Price/100": st.column_config.NumberColumn("List Price/100", disabled=True),
+                "Rate / Pc (₹)": st.column_config.NumberColumn("Rate / Pc (₹)", disabled=True, format="₹%.2f"),
                 "Quantity": st.column_config.NumberColumn("Quantity", min_value=1, step=1),
                 "Custom Disc %": st.column_config.NumberColumn("Custom Disc %", min_value=0.0, max_value=100.0),
                 "Action": st.column_config.CheckboxColumn("Remove Item")

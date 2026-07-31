@@ -42,7 +42,7 @@ class OrderService:
             
             # Fetch product details with active price and stock
             prod = query_db(
-                """SELECT p.*, i.current_stock, c.price_per_100_pcs 
+                """SELECT p.*, i.current_stock, c.price_per_100_pcs, c.price_per_unit 
                    FROM PRODUCTS p
                    LEFT JOIN INVENTORY i ON p.id = i.product_id
                    LEFT JOIN PRODUCT_COSTS c ON p.id = c.product_id AND c.is_current = 1
@@ -53,7 +53,16 @@ class OrderService:
             if not prod:
                 raise ValueError(f"Product ID {product_id} not found in database.")
             
-            price_per_100 = float(prod['price_per_100_pcs'] or 0)
+            # Determine unit price per piece (rate per pc)
+            if item.get('unit_price') is not None:
+                price_per_unit = float(item['unit_price'])
+            elif item.get('unit_price_100') is not None:
+                price_per_unit = float(item['unit_price_100']) / 100.0
+            elif prod['price_per_unit'] is not None:
+                price_per_unit = float(prod['price_per_unit'])
+            else:
+                price_per_unit = float(prod['price_per_100_pcs'] or 0) / 100.0
+
             current_stock = float(prod['current_stock'] or 0)
             
             # Use item discount percentage or fallback to customer default
@@ -63,9 +72,9 @@ class OrderService:
             else:
                 discount_pct = float(discount_pct)
                 
-            # Line total: (Qty * Price_per_100 * (1 - disc%)) / 100
-            discounted_price_per_100 = price_per_100 * (1 - (discount_pct / 100.0))
-            line_total = (qty * discounted_price_per_100) / 100.0
+            # Line total: Qty * Price_per_piece * (1 - disc%)
+            discounted_unit_price = price_per_unit * (1 - (discount_pct / 100.0))
+            line_total = qty * discounted_unit_price
             subtotal += line_total
             
             # Check stock warning (Verification only, no auto subtraction)
@@ -79,7 +88,8 @@ class OrderService:
                 "part_name": prod["part_name"] or prod["part_number"],
                 "quantity": qty,
                 "current_stock": current_stock,
-                "unit_price_100": price_per_100,
+                "unit_price": price_per_unit,
+                "unit_price_100": price_per_unit * 100.0,
                 "discount_percentage": discount_pct,
                 "gst_percentage": gst_rate,
                 "line_total": round(line_total, 2),
