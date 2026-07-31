@@ -319,15 +319,18 @@ button[data-baseweb="tab"][aria-selected="true"] {
 .setting-section {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1.25rem 1.5rem;
-    margin-bottom: 1.25rem;
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 1rem;
+    margin-bottom: 0.5rem;
+    display: inline-flex;
+    align-items: center;
 }
 .setting-section-title {
-    font-size: 0.78rem; font-weight: 700;
+    font-size: 0.72rem; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.07em;
-    color: var(--text-muted); margin-bottom: 0.85rem;
+    color: var(--text-muted);
     display: flex; align-items: center; gap: 8px;
+    margin: 0;
 }
 .setting-section-title i { color: var(--accent); }
 
