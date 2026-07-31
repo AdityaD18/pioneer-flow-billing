@@ -9,7 +9,7 @@ import textwrap
 # Ensure project modules are on path
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
-from app.models.database import init_db, query_db, execute_db
+from app.models.database import init_db, query_db, execute_db, get_db_connection
 from app.services.import_service import ImportService
 from app.services.customer_service import CustomerService
 from app.services.order_service import OrderService
