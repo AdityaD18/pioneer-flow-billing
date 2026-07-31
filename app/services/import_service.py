@@ -1,4 +1,5 @@
 import os
+import re
 import pandas as pd
 import sqlite3
 from datetime import datetime
@@ -101,8 +102,11 @@ class ImportService:
                 return default
             try:
                 cleaned = str(val).replace(',', '').strip()
-                return float(cleaned)
-            except ValueError:
+                match = re.search(r'[-+]?\d*\.?\d+', cleaned)
+                if match:
+                    return float(match.group(0))
+                return default
+            except Exception:
                 return default
 
         total_records = len(df)
