@@ -14,6 +14,7 @@ from app.services.import_service import ImportService
 from app.services.customer_service import CustomerService
 from app.services.order_service import OrderService
 from app.services.invoice_service import InvoiceService
+from app.services.quotation_service import QuotationService
 
 # 1. Page Configuration
 st.set_page_config(
@@ -207,6 +208,11 @@ def generate_invoice_html(invoice_data):
     half_gst_amount = gst_amount / 2.0
     grand_total = order['grand_total']
     
+    inv_num = invoice_data['invoice_number']
+    is_qtn = inv_num.startswith("QTN")
+    doc_title = "PROFORMA QUOTATION" if is_qtn else "TAX INVOICE"
+    num_lbl = "Quotation No:" if is_qtn else "Invoice No:"
+    
     items_rows = ""
     for idx, item in enumerate(invoice_data['items']):
         items_rows += f"""
@@ -226,7 +232,7 @@ def generate_invoice_html(invoice_data):
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Invoice {invoice_data['invoice_number']}</title>
+        <title>{doc_title} {invoice_data['invoice_number']}</title>
         <style>
             body {{ font-family: Arial, sans-serif; color: #111; padding: 20px; background-color: #fff; }}
             .sheet {{ max-width: 800px; margin: 0 auto; border: 1px solid #ccc; padding: 30px; border-radius: 6px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }}
@@ -274,9 +280,9 @@ def generate_invoice_html(invoice_data):
                     <p>Email: rajesh@pioneerautomation.in | UDYAM-MH-26-0071108</p>
                 </div>
                 <div class="doc-title">
-                    <h1>TAX INVOICE</h1>
+                    <h1>{doc_title}</h1>
                     <div class="badge-row">
-                        <div class="badge-lbl">Invoice No:</div>
+                        <div class="badge-lbl">{num_lbl}</div>
                         <div>{invoice_data['invoice_number']}</div>
                     </div>
                     <div class="badge-row">
@@ -376,14 +382,15 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 5. Core Navigation Tabs
-t_dash, t_imports, t_catalog, t_inventory, t_customers, t_invoice, t_history, t_manual, t_settings = st.tabs([
+t_dash, t_imports, t_catalog, t_inventory, t_customers, t_invoice, t_quotation, t_history, t_manual, t_settings = st.tabs([
     "📊 Dashboard", 
     "📁 Import Sheets", 
     "📦 Product Catalog", 
     "🔍 Available Inventory",
     "👥 Customers", 
     "📝 New Invoice", 
-    "📜 Invoice History",
+    "📄 New Quotation",
+    "📜 History Ledger",
     "➕ Manual Entry",
     "⚙️ Settings"
 ])
@@ -405,12 +412,16 @@ def trigger_toast(message, icon="ℹ️"):
 # Initialize session states for UI controllers
 if "invoice_items" not in st.session_state:
     st.session_state.invoice_items = []
+if "quotation_items" not in st.session_state:
+    st.session_state.quotation_items = []
 if "prod_search_val" not in st.session_state:
     st.session_state.prod_search_val = ""
 if "cust_search_val" not in st.session_state:
     st.session_state.cust_search_val = ""
 if "last_invoice_generated" not in st.session_state:
     st.session_state.last_invoice_generated = None
+if "last_quotation_generated" not in st.session_state:
+    st.session_state.last_quotation_generated = None
 
 # --- TAB: DASHBOARD ---
 with t_dash:
@@ -748,9 +759,10 @@ with t_invoice:
     col_left, col_right = st.columns([1.2, 1])
     
     with col_left:
-        st.subheader("1. Catalog item details")
+        st.subheader("1. Enter / Paste Line Items")
+        st.write("Copy and paste cells (Part Number and Quantity columns) from Excel directly into the table below.")
         
-        # Load all products for merged search & lookup selectbox
+        # Load all products for validation and registration
         all_prods = query_db(
             """SELECT p.*, i.current_stock, c.price_per_100_pcs 
                FROM PRODUCTS p
@@ -758,64 +770,114 @@ with t_invoice:
                LEFT JOIN PRODUCT_COSTS c ON p.id = c.product_id AND c.is_current = 1
                ORDER BY p.part_number ASC"""
         )
-        prod_options = ["- Search & Select Part -"]
-        prod_map = {}
-        for p in all_prods:
-            stock_val = p['current_stock'] if p['current_stock'] is not None else 0.0
-            price_val = p['price_per_100_pcs'] if p['price_per_100_pcs'] is not None else 0.0
-            label = f"{p['part_number']} | {p['make']} (Stock: {stock_val}, Price: ₹{price_val}/100)"
-            prod_options.append(label)
-            prod_map[label] = p
-            
-        selected_prod_label = st.selectbox("Search & Select Part (Type Part Number or Make)", prod_options, key="inv_part_select")
         
-        selected_prod = None
-        if selected_prod_label != "- Search & Select Part -":
-            selected_prod = prod_map[selected_prod_label]
+        # We present an editable grid
+        if "inv_bulk_input_df" not in st.session_state:
+            st.session_state.inv_bulk_input_df = pd.DataFrame(
+                [{"Part Number": "", "Quantity": 1}],
+                columns=["Part Number", "Quantity"]
+            )
             
-        col_add1, col_add2, col_add3 = st.columns([1, 1, 1])
-        with col_add1:
-            item_qty = st.number_input("Item Quantity", min_value=1, value=1, key="inv_item_qty")
-        with col_add2:
-            item_disc_str = st.text_input("Custom Discount % (Blank = Default)", "", key="inv_item_disc")
-        with col_add3:
-            st.write(" ") # spacer
-            st.write(" ") # spacer
-            if st.button("Add Item to Invoice Draft", use_container_width=True, key="inv_add_item_btn"):
-                if selected_prod is None:
-                    st.error("Please select a product first.")
+        edited_inv_df = st.data_editor(
+            st.session_state.inv_bulk_input_df,
+            num_rows="dynamic",
+            column_config={
+                "Part Number": st.column_config.TextColumn("Part Number / Item Code", width="medium"),
+                "Quantity": st.column_config.NumberColumn("Quantity (PCS)", min_value=1, value=1, step=1)
+            },
+            use_container_width=True,
+            key="bulk_inv_data_editor"
+        )
+        
+        # Add buttons to process grid
+        col_grid_btn1, col_grid_btn2 = st.columns([1, 1])
+        with col_grid_btn1:
+            if st.button("Add Items to Invoice Draft", type="primary", use_container_width=True, key="bulk_add_to_inv_draft_btn"):
+                # Clean up empty rows
+                non_empty_rows = edited_inv_df[edited_inv_df["Part Number"].astype(str).str.strip() != ""]
+                if len(non_empty_rows) == 0:
+                    st.error("No valid items entered in the grid.")
                 else:
-                    custom_disc = None
-                    if item_disc_str.strip() != "":
+                    db_prods = {p['part_number'].strip().lower(): p for p in all_prods}
+                    added_count = 0
+                    registered_count = 0
+                    
+                    for idx, row in non_empty_rows.iterrows():
+                        part_no = str(row["Part Number"]).strip()
+                        part_no_clean = part_no.replace('"', '').replace("'", "")
+                        
                         try:
-                            custom_disc = float(item_disc_str)
-                            if not (0 <= custom_disc <= 100):
-                                raise ValueError()
-                        except ValueError:
-                            st.error("Invalid custom discount percentage.")
-                            custom_disc = None
+                            qty = int(float(str(row["Quantity"]).replace(',', '').strip()))
+                        except:
+                            qty = 1
                             
-                    # Add to session list
-                    found = False
-                    for i in st.session_state.invoice_items:
-                        if i['product_id'] == selected_prod['id']:
-                            i['quantity'] += item_qty
-                            if custom_disc is not None:
-                                i['discount_percentage'] = custom_disc
-                            found = True
-                            break
-                    if not found:
-                        st.session_state.invoice_items.append({
-                            "product_id": selected_prod['id'],
-                            "part_number": selected_prod['part_number'],
-                            "part_name": selected_prod['part_name'] or selected_prod['part_number'],
-                            "quantity": item_qty,
-                            "current_stock": selected_prod['current_stock'] if selected_prod['current_stock'] is not None else 0.0,
-                            "unit_price_100": selected_prod['price_per_100_pcs'] if selected_prod['price_per_100_pcs'] is not None else 0.0,
-                            "discount_percentage": custom_disc
-                        })
-                    trigger_toast(f"Added product {selected_prod['part_number']} to draft!", icon="🛒")
-                    st.rerun()
+                        key_lower = part_no_clean.lower()
+                        
+                        # Resolve product
+                        if key_lower in db_prods:
+                            matched_prod = db_prods[key_lower]
+                            product_id = matched_prod['id']
+                            current_stock = matched_prod['current_stock'] if matched_prod['current_stock'] is not None else 0.0
+                            unit_price_100 = matched_prod['price_per_100_pcs'] if matched_prod['price_per_100_pcs'] is not None else 0.0
+                        else:
+                            # Auto register
+                            series = part_no_clean.split('-')[0] if '-' in part_no_clean else None
+                            conn_ins = get_db_connection()
+                            cur_ins = conn_ins.cursor()
+                            try:
+                                cur_ins.execute("INSERT INTO PRODUCTS (part_number, part_name, series, make) VALUES (?, ?, ?, ?)",
+                                                (part_no_clean, part_no_clean, series, 'WAGO'))
+                                product_id = cur_ins.lastrowid
+                                cur_ins.execute("INSERT INTO INVENTORY (product_id, current_stock) VALUES (?, 0.0)", (product_id,))
+                                cur_ins.execute("INSERT INTO PRODUCT_COSTS (product_id, price_per_100_pcs, price_per_unit, is_current) VALUES (?, 0.0, 0.0, 1)", (product_id,))
+                                conn_ins.commit()
+                                registered_count += 1
+                            except:
+                                product_id = None
+                            finally:
+                                conn_ins.close()
+                                
+                            current_stock = 0.0
+                            unit_price_100 = 0.0
+                            
+                        if product_id is not None:
+                            # Check if already in draft
+                            found = False
+                            for i in st.session_state.invoice_items:
+                                if i['product_id'] == product_id:
+                                    i['quantity'] += qty
+                                    found = True
+                                    break
+                            if not found:
+                                st.session_state.invoice_items.append({
+                                    "product_id": product_id,
+                                    "part_number": part_no_clean,
+                                    "part_name": part_no_clean,
+                                    "quantity": qty,
+                                    "current_stock": current_stock,
+                                    "unit_price_100": unit_price_100,
+                                    "discount_percentage": None
+                                })
+                            added_count += 1
+                            
+                    if added_count > 0:
+                        msg = f"Added {added_count} items to invoice draft!"
+                        if registered_count > 0:
+                            msg += f" (Registered {registered_count} new parts with 0 cost)"
+                        # Clear input grid state
+                        st.session_state.inv_bulk_input_df = pd.DataFrame(
+                            [{"Part Number": "", "Quantity": 1}],
+                            columns=["Part Number", "Quantity"]
+                        )
+                        trigger_toast(msg, icon="🛒")
+                        st.rerun()
+        with col_grid_btn2:
+            if st.button("Clear Grid Editor", use_container_width=True, key="clear_inv_grid_btn"):
+                st.session_state.inv_bulk_input_df = pd.DataFrame(
+                    [{"Part Number": "", "Quantity": 1}],
+                    columns=["Part Number", "Quantity"]
+                )
+                st.rerun()
                     
     with col_right:
         st.subheader("2. Customer & billing details")
@@ -1022,78 +1084,440 @@ with t_invoice:
         # Render the raw HTML template in Streamlit
         components.html(html_content, height=850, scrolling=True)
 
-# --- TAB: INVOICE HISTORY ---
-with t_history:
-    st.markdown("### Billing Ledger Logs")
+# --- TAB: NEW QUOTATION ---
+with t_quotation:
+    st.markdown("### Interactive Proforma Quotation Generator")
     
-    q_inv_search = st.text_input("Search Invoices (Invoice Number, Customer Name)", placeholder="e.g. INV-2026")
+    # Left column for Item additions (tabulated grid)
+    # Right column for Customer & Billing Details + Totals (Live totals & settings)
+    col_q_left, col_q_right = st.columns([1.2, 1])
     
-    if q_inv_search:
-        q = f"%{q_inv_search.strip()}%"
-        invoices = query_db(
-            """SELECT i.*, o.customer_name_snapshot, o.grand_total, o.order_number 
-               FROM INVOICES i
-               JOIN ORDERS o ON i.order_id = o.id
-               WHERE i.invoice_number LIKE ? OR o.customer_name_snapshot LIKE ?
-               ORDER BY i.created_at DESC""",
-            (q, q)
-        )
-    else:
-        invoices = query_db(
-            """SELECT i.*, o.customer_name_snapshot, o.grand_total, o.order_number 
-               FROM INVOICES i
-               JOIN ORDERS o ON i.order_id = o.id
-               ORDER BY i.created_at DESC"""
+    with col_q_left:
+        st.subheader("1. Enter / Paste Line Items")
+        st.write("Copy and paste cells (Part Number and Quantity columns) from Excel directly into the table below.")
+        
+        # Load all products for validation and registration
+        all_q_prods = query_db(
+            """SELECT p.*, i.current_stock, c.price_per_100_pcs 
+               FROM PRODUCTS p
+               LEFT JOIN INVENTORY i ON p.id = i.product_id
+               LEFT JOIN PRODUCT_COSTS c ON p.id = c.product_id AND c.is_current = 1
+               ORDER BY p.part_number ASC"""
         )
         
-    if len(invoices) == 0:
-        st.info("No invoices found in ledger database.")
-    else:
-        # User selectbox to details
-        inv_options = ["- Select Invoice to Print -"] + [f"{i['invoice_number']} - {i['customer_name_snapshot']} (₹{i['grand_total']:.2f})" for i in invoices]
-        selected_to_print = st.selectbox("Choose Invoice to View & Download Print Sheet", inv_options)
+        # We present an editable grid
+        if "qtn_bulk_input_df" not in st.session_state:
+            st.session_state.qtn_bulk_input_df = pd.DataFrame(
+                [{"Part Number": "", "Quantity": 1}],
+                columns=["Part Number", "Quantity"]
+            )
+            
+        edited_qtn_df = st.data_editor(
+            st.session_state.qtn_bulk_input_df,
+            num_rows="dynamic",
+            column_config={
+                "Part Number": st.column_config.TextColumn("Part Number / Item Code", width="medium"),
+                "Quantity": st.column_config.NumberColumn("Quantity (PCS)", min_value=1, value=1, step=1)
+            },
+            use_container_width=True,
+            key="bulk_qtn_data_editor"
+        )
         
-        if selected_to_print != "- Select Invoice to Print -":
-            selected_idx = inv_options.index(selected_to_print) - 1
-            inv_record = invoices[selected_idx]
-            
-            invoice_full = InvoiceService.get_invoice_by_id(inv_record['id'])
-            
-            col_print1, col_print2 = st.columns([3, 1])
-            with col_print1:
-                st.markdown(f"#### 📄 Invoice Details: {invoice_full['invoice_number']}")
-            with col_print2:
-                html_invoice = generate_invoice_html(invoice_full)
-                st.download_button(
-                    label="📥 Download Print Sheet (HTML)",
-                    data=html_invoice,
-                    file_name=f"invoice_{invoice_full['invoice_number']}.html",
-                    mime="text/html",
-                    use_container_width=True
+        # Add buttons to process grid
+        col_q_grid_btn1, col_q_grid_btn2 = st.columns([1, 1])
+        with col_q_grid_btn1:
+            if st.button("Add Items to Quotation Draft", type="primary", use_container_width=True, key="bulk_add_to_qtn_draft_btn"):
+                # Clean up empty rows
+                non_empty_q_rows = edited_qtn_df[edited_qtn_df["Part Number"].astype(str).str.strip() != ""]
+                if len(non_empty_q_rows) == 0:
+                    st.error("No valid items entered in the grid.")
+                else:
+                    db_prods = {p['part_number'].strip().lower(): p for p in all_q_prods}
+                    added_count = 0
+                    registered_count = 0
+                    
+                    for idx, row in non_empty_q_rows.iterrows():
+                        part_no = str(row["Part Number"]).strip()
+                        part_no_clean = part_no.replace('"', '').replace("'", "")
+                        
+                        try:
+                            qty = int(float(str(row["Quantity"]).replace(',', '').strip()))
+                        except:
+                            qty = 1
+                            
+                        key_lower = part_no_clean.lower()
+                        
+                        # Resolve product
+                        if key_lower in db_prods:
+                            matched_prod = db_prods[key_lower]
+                            product_id = matched_prod['id']
+                            current_stock = matched_prod['current_stock'] if matched_prod['current_stock'] is not None else 0.0
+                            unit_price_100 = matched_prod['price_per_100_pcs'] if matched_prod['price_per_100_pcs'] is not None else 0.0
+                        else:
+                            # Auto register
+                            series = part_no_clean.split('-')[0] if '-' in part_no_clean else None
+                            conn_ins = get_db_connection()
+                            cur_ins = conn_ins.cursor()
+                            try:
+                                cur_ins.execute("INSERT INTO PRODUCTS (part_number, part_name, series, make) VALUES (?, ?, ?, ?)",
+                                                (part_no_clean, part_no_clean, series, 'WAGO'))
+                                product_id = cur_ins.lastrowid
+                                cur_ins.execute("INSERT INTO INVENTORY (product_id, current_stock) VALUES (?, 0.0)", (product_id,))
+                                cur_ins.execute("INSERT INTO PRODUCT_COSTS (product_id, price_per_100_pcs, price_per_unit, is_current) VALUES (?, 0.0, 0.0, 1)", (product_id,))
+                                conn_ins.commit()
+                                registered_count += 1
+                            except:
+                                product_id = None
+                            finally:
+                                conn_ins.close()
+                                
+                            current_stock = 0.0
+                            unit_price_100 = 0.0
+                            
+                        if product_id is not None:
+                            # Check if already in draft
+                            found = False
+                            for i in st.session_state.quotation_items:
+                                if i['product_id'] == product_id:
+                                    i['quantity'] += qty
+                                    found = True
+                                    break
+                            if not found:
+                                st.session_state.quotation_items.append({
+                                    "product_id": product_id,
+                                    "part_number": part_no_clean,
+                                    "part_name": part_no_clean,
+                                    "quantity": qty,
+                                    "current_stock": current_stock,
+                                    "unit_price_100": unit_price_100,
+                                    "discount_percentage": None
+                                })
+                            added_count += 1
+                            
+                    if added_count > 0:
+                        msg = f"Added {added_count} items to quotation draft!"
+                        if registered_count > 0:
+                            msg += f" (Registered {registered_count} new parts with 0 cost)"
+                        # Clear input grid state
+                        st.session_state.qtn_bulk_input_df = pd.DataFrame(
+                            [{"Part Number": "", "Quantity": 1}],
+                            columns=["Part Number", "Quantity"]
+                        )
+                        trigger_toast(msg, icon="🛒")
+                        st.rerun()
+        with col_q_grid_btn2:
+            if st.button("Clear Grid Editor", use_container_width=True, key="clear_qtn_grid_btn"):
+                st.session_state.qtn_bulk_input_df = pd.DataFrame(
+                    [{"Part Number": "", "Quantity": 1}],
+                    columns=["Part Number", "Quantity"]
                 )
-            # Render html
-            components.html(html_invoice, height=850, scrolling=True)
-        else:
-            # Show list table
-            rows_html = ""
-            for inv in invoices:
-                rows_html += f"<tr><td><strong>{inv['invoice_number']}</strong></td><td>{inv['invoice_date']}</td><td>{inv['customer_name_snapshot']}</td><td>{inv['order_number']}</td><td><strong>₹{inv['grand_total']:.2f}</strong></td></tr>"
-            render_html(f"""
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Invoice No</th>
-                        <th>Billing Date</th>
-                        <th>Customer / Company</th>
-                        <th>Order Ref</th>
-                        <th>Grand Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows_html}
-                </tbody>
-            </table>
+                st.rerun()
+                
+    with col_q_right:
+        st.subheader("2. Customer & billing details")
+        customers = CustomerService.get_customers()
+        cust_names = ["- Create New Inline -"] + [c['name'] for c in customers]
+        
+        # Select active profile
+        selected_cust_name = st.selectbox("Search / Select Active Billing Profile", cust_names, key="qtn_cust_select")
+        
+        # Initialize sync state if missing
+        if "prev_selected_cust_q" not in st.session_state:
+            st.session_state.prev_selected_cust_q = "- Create New Inline -"
+            st.session_state.qtn_billing_name = ""
+            st.session_state.qtn_billing_discount = 0.0
+            st.session_state.qtn_billing_gst = ""
+            st.session_state.qtn_billing_terms = ""
+            
+        # Detect selection change and update widget state values
+        if selected_cust_name != st.session_state.prev_selected_cust_q:
+            if selected_cust_name == "- Create New Inline -":
+                st.session_state.qtn_billing_name = ""
+                st.session_state.qtn_billing_discount = 0.0
+                st.session_state.qtn_billing_gst = ""
+                st.session_state.qtn_billing_terms = ""
+            else:
+                cust_profile = CustomerService.get_customer_by_name(selected_cust_name)
+                if cust_profile:
+                    st.session_state.qtn_billing_name = cust_profile['name']
+                    st.session_state.qtn_billing_discount = cust_profile['discount_percentage']
+                    st.session_state.qtn_billing_gst = cust_profile['gst_number'] or ""
+                    st.session_state.qtn_billing_terms = cust_profile['payment_terms'] or ""
+            st.session_state.prev_selected_cust_q = selected_cust_name
+            
+        # Display inputs
+        inv_billing_name = st.text_input("Customer Name / Company *", key="qtn_billing_name", placeholder="e.g. Demo1")
+        inv_billing_discount = st.number_input("Discount Percentage (%)", min_value=0.0, max_value=100.0, step=0.01, key="qtn_billing_discount")
+        inv_billing_gst = st.text_input("GSTIN Number", key="qtn_billing_gst", placeholder="e.g. 27DEMO11234A1Z1")
+        inv_billing_terms = st.text_input("Payment Terms", key="qtn_billing_terms", placeholder="e.g. Net 30 Days")
+        
+        # Prepare customer object
+        cust_payload = {
+            "name": inv_billing_name.strip(),
+            "discount_percentage": inv_billing_discount,
+            "gst_number": inv_billing_gst.strip() or None,
+            "payment_terms": inv_billing_terms.strip() or None
+        }
+        
+        qtn_date = st.date_input("Quotation Date", datetime.now(), key="qtn_date")
+        
+        st.subheader("3. Live totals & actions")
+        if len(st.session_state.quotation_items) == 0:
+            render_html("""
+            <div class="metric-card">
+                <div class="metric-label">Subtotal:</div>
+                <div class="metric-value">₹0.00</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Grand Total (Incl Tax):</div>
+                <div class="metric-value" style="color: var(--cyan);">₹0.00</div>
+            </div>
             """)
+            st.info("Assemble line items on the left to see calculations.")
+        else:
+            calc = OrderService.calculate_order(cust_payload, st.session_state.quotation_items)
+            
+            render_html(f"""
+            <div class="metric-card">
+                <div class="metric-label">Subtotal:</div>
+                <div class="metric-value">₹{calc['subtotal']:.2f}</div>
+                <div class="metric-label" style="margin-top: 10px;">GST ({calc['gst_rate']}%):</div>
+                <div class="metric-value">₹{calc['gst_amount']:.2f}</div>
+                <hr style="border: none; border-top: 1px solid var(--border); margin: 10px 0;">
+                <div class="metric-label">Grand Total (Excl. Shipping):</div>
+                <div class="metric-value" style="color: var(--cyan);">₹{calc['grand_total']:.2f}</div>
+            </div>
+            """)
+            
+            if calc['has_warnings']:
+                st.warning("⚠️ Some items in this quotation draft exceed available physical stock.")
+                
+            if st.button("Generate Quotation", type="primary", use_container_width=True, key="generate_qtn_btn"):
+                if not inv_billing_name.strip():
+                    st.error("Customer name is required.")
+                else:
+                    try:
+                        quotation_id = QuotationService.generate_quotation(
+                            customer_input=cust_payload,
+                            items_input=st.session_state.quotation_items,
+                            quotation_date=qtn_date.strftime('%Y-%m-%d')
+                        )
+                        qtn_data = QuotationService.get_quotation_by_id(quotation_id)
+                        st.session_state.last_quotation_generated = qtn_data
+                        st.session_state.quotation_items = []
+                        trigger_toast(f"Quotation {qtn_data['quotation_number']} generated!", icon="📄")
+                        st.rerun()
+                    except Exception as ex:
+                        st.error(f"Failed to generate quotation: {str(ex)}")
+
+    # Display items table below configuration
+    st.subheader("📋 Quotation Line Items Grid")
+    if len(st.session_state.quotation_items) == 0:
+        st.info("No items added to quotation draft yet. Enter details in the grid panel above.")
+    else:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        col_q_gr1, col_q_gr2 = st.columns([5, 1])
+        with col_q_gr1:
+            st.markdown("*Use the table editor below to modify quantities or check 'Remove Item' to delete a row.*")
+        with col_q_gr2:
+            if st.button("Reset Draft", use_container_width=True, key="reset_qtn_draft_items"):
+                st.session_state.quotation_items = []
+                st.rerun()
+                
+        # Build pandas dataframe for the st.data_editor
+        df_editor_data = []
+        for idx, i in enumerate(st.session_state.quotation_items):
+            df_editor_data.append({
+                "Part Number": i["part_number"],
+                "Available Stock": i["current_stock"],
+                "Quantity": i["quantity"],
+                "List Price/100": i["unit_price_100"],
+                "Custom Disc %": i["discount_percentage"] if i["discount_percentage"] is not None else 0.0,
+                "Action": False
+            })
+            
+        df_editor = pd.DataFrame(df_editor_data)
+        edited_df = st.data_editor(
+            df_editor,
+            column_config={
+                "Part Number": st.column_config.TextColumn("Part Number", disabled=True),
+                "Available Stock": st.column_config.NumberColumn("Available Stock", disabled=True),
+                "List Price/100": st.column_config.NumberColumn("List Price/100", disabled=True),
+                "Quantity": st.column_config.NumberColumn("Quantity", min_value=1, step=1),
+                "Custom Disc %": st.column_config.NumberColumn("Custom Disc %", min_value=0.0, max_value=100.0),
+                "Action": st.column_config.CheckboxColumn("Remove Item")
+            },
+            hide_index=True,
+            use_container_width=True,
+            key="qtn_data_editor"
+        )
+        
+        # Check updates
+        sync_items = []
+        for idx, row in edited_df.iterrows():
+            if row["Action"] is True:
+                continue
+            
+            orig_item = st.session_state.quotation_items[idx]
+            orig_item["quantity"] = int(row["Quantity"])
+            orig_item["discount_percentage"] = float(row["Custom Disc %"]) if row["Custom Disc %"] > 0 else None
+            sync_items.append(orig_item)
+            
+        if len(sync_items) != len(st.session_state.quotation_items) or any(
+            sync_items[x]['quantity'] != st.session_state.quotation_items[x]['quantity'] for x in range(len(sync_items))
+        ):
+            st.session_state.quotation_items = sync_items
+            st.rerun()
+            
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    if st.session_state.last_quotation_generated:
+        st.write("---")
+        st.subheader("Quotation Output Preview")
+        
+        qtn_info = st.session_state.last_quotation_generated
+        
+        col_q_pr1, col_q_pr2 = st.columns([3, 1])
+        with col_q_pr1:
+            st.info(f"Quotation **{qtn_info['quotation_number']}** generated successfully. You can download the printable HTML document on the right to print as a PDF.")
+        with col_q_pr2:
+            html_content = generate_invoice_html(qtn_info)
+            st.download_button(
+                label="📥 Download Printable HTML Quotation",
+                data=html_content,
+                file_name=f"quotation_{qtn_info['quotation_number']}.html",
+                mime="text/html",
+                use_container_width=True
+            )
+            if st.button("Close Preview", use_container_width=True, key="close_qtn_preview_btn"):
+                st.session_state.last_quotation_generated = None
+                st.rerun()
+                
+        components.html(html_content, height=850, scrolling=True)
+
+# --- TAB: LEDGER HISTORY ---
+with t_history:
+    st.markdown("### 📜 System History Ledger")
+    
+    ledger_type = st.radio("Choose Ledger Type", ["Invoices Ledger", "Quotations Ledger"], horizontal=True, key="ledger_history_type")
+    
+    if ledger_type == "Invoices Ledger":
+        q_inv_search = st.text_input("Search Invoices (Invoice Number, Customer Name)", placeholder="e.g. INV-2026", key="inv_search_inp")
+        
+        if q_inv_search:
+            q = f"%{q_inv_search.strip()}%"
+            invoices = query_db(
+                """SELECT i.*, o.customer_name_snapshot, o.grand_total, o.order_number 
+                   FROM INVOICES i
+                   JOIN ORDERS o ON i.order_id = o.id
+                   WHERE i.invoice_number LIKE ? OR o.customer_name_snapshot LIKE ?
+                   ORDER BY i.created_at DESC""",
+                (q, q)
+            )
+        else:
+            invoices = query_db(
+                """SELECT i.*, o.customer_name_snapshot, o.grand_total, o.order_number 
+                   FROM INVOICES i
+                   JOIN ORDERS o ON i.order_id = o.id
+                   ORDER BY i.created_at DESC"""
+            )
+            
+        if len(invoices) == 0:
+            st.info("No invoices found in ledger database.")
+        else:
+            inv_options = ["- Select Invoice to Print -"] + [f"{i['invoice_number']} - {i['customer_name_snapshot']} (₹{i['grand_total']:.2f})" for i in invoices]
+            selected_to_print = st.selectbox("Choose Invoice to View & Download Print Sheet", inv_options, key="hist_inv_select")
+            
+            if selected_to_print != "- Select Invoice to Print -":
+                selected_idx = inv_options.index(selected_to_print) - 1
+                inv_record = invoices[selected_idx]
+                invoice_full = InvoiceService.get_invoice_by_id(inv_record['id'])
+                
+                col_print1, col_print2 = st.columns([3, 1])
+                with col_print1:
+                    st.markdown(f"#### 📄 Invoice Details: {invoice_full['invoice_number']}")
+                with col_print2:
+                    html_invoice = generate_invoice_html(invoice_full)
+                    st.download_button(
+                        label="📥 Download Print Sheet (HTML)",
+                        data=html_invoice,
+                        file_name=f"invoice_{invoice_full['invoice_number']}.html",
+                        mime="text/html",
+                        use_container_width=True,
+                        key="dl_inv_hist_btn"
+                    )
+                components.html(html_invoice, height=850, scrolling=True)
+            else:
+                rows_html = ""
+                for inv in invoices:
+                    rows_html += f"<tr><td><strong>{inv['invoice_number']}</strong></td><td>{inv['invoice_date']}</td><td>{inv['customer_name_snapshot']}</td><td>{inv['order_number']}</td><td><strong>₹{inv['grand_total']:.2f}</strong></td></tr>"
+                render_html(f"""
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Invoice No</th>
+                            <th>Billing Date</th>
+                            <th>Customer / Company</th>
+                            <th>Order Ref</th>
+                            <th>Grand Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows_html}
+                    </tbody>
+                </table>
+                """)
+    else:
+        # Quotations Ledger
+        q_qtn_search = st.text_input("Search Quotations (Quotation Number, Customer Name)", placeholder="e.g. QTN-2026", key="qtn_search_inp")
+        
+        quotations = QuotationService.get_quotations(q_qtn_search.strip() if q_qtn_search else None)
+        
+        if len(quotations) == 0:
+            st.info("No quotations found in ledger database.")
+        else:
+            qtn_options = ["- Select Quotation to Print -"] + [f"{q['quotation_number']} - {q['customer_name_snapshot']} (₹{q['grand_total']:.2f})" for q in quotations]
+            selected_to_print = st.selectbox("Choose Quotation to View & Download Print Sheet", qtn_options, key="hist_qtn_select")
+            
+            if selected_to_print != "- Select Quotation to Print -":
+                selected_idx = qtn_options.index(selected_to_print) - 1
+                qtn_record = quotations[selected_idx]
+                qtn_full = QuotationService.get_quotation_by_id(qtn_record['id'])
+                
+                col_print1, col_print2 = st.columns([3, 1])
+                with col_print1:
+                    st.markdown(f"#### 📄 Quotation Details: {qtn_full['quotation_number']}")
+                with col_print2:
+                    html_qtn = generate_invoice_html(qtn_full)
+                    st.download_button(
+                        label="📥 Download Print Sheet (HTML)",
+                        data=html_qtn,
+                        file_name=f"quotation_{qtn_full['quotation_number']}.html",
+                        mime="text/html",
+                        use_container_width=True,
+                        key="dl_qtn_hist_btn"
+                    )
+                components.html(html_qtn, height=850, scrolling=True)
+            else:
+                rows_html = ""
+                for qtn in quotations:
+                    rows_html += f"<tr><td><strong>{qtn['quotation_number']}</strong></td><td>{qtn['created_at'][:10]}</td><td>{qtn['customer_name_snapshot']}</td><td>-</td><td><strong>₹{qtn['grand_total']:.2f}</strong></td></tr>"
+                render_html(f"""
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Quotation No</th>
+                            <th>Date</th>
+                            <th>Customer / Company</th>
+                            <th>Order Ref</th>
+                            <th>Grand Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows_html}
+                    </tbody>
+                </table>
+                """)
 
 # --- TAB: MANUAL ENTRY ---
 with t_manual:

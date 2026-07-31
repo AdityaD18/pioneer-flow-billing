@@ -118,3 +118,43 @@ CREATE TABLE IF NOT EXISTS APP_SETTINGS (
 
 -- Insert default configurations
 INSERT OR IGNORE INTO APP_SETTINGS (key, value) VALUES ('gst_rate', '18.0');
+
+-- 11. QUOTATIONS
+CREATE TABLE IF NOT EXISTS QUOTATIONS (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    quotation_number TEXT UNIQUE NOT NULL,
+    customer_id INTEGER NOT NULL REFERENCES CUSTOMERS(id) ON DELETE RESTRICT,
+    customer_name_snapshot TEXT NOT NULL,
+    customer_gst_snapshot TEXT NULL,
+    customer_terms_snapshot TEXT NULL,
+    discount_percentage REAL DEFAULT 0,
+    subtotal REAL DEFAULT 0,
+    discount_amount REAL DEFAULT 0,
+    gst_amount REAL DEFAULT 0,
+    grand_total REAL DEFAULT 0,
+    gst_rate REAL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 12. QUOTATION_ITEMS
+CREATE TABLE IF NOT EXISTS QUOTATION_ITEMS (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    quotation_id INTEGER NOT NULL REFERENCES QUOTATIONS(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL REFERENCES PRODUCTS(id) ON DELETE RESTRICT,
+    part_number_snapshot TEXT NOT NULL,
+    part_name_snapshot TEXT NULL,
+    quantity REAL NOT NULL,
+    unit_price REAL NOT NULL, -- price per 100 pcs snapshot
+    discount_percentage REAL DEFAULT 0,
+    gst_percentage REAL DEFAULT 0,
+    line_total REAL NOT NULL
+);
+
+-- 13. QUOTATION_SEQUENCE
+CREATE TABLE IF NOT EXISTS QUOTATION_SEQUENCE (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    year TEXT NOT NULL,
+    seq_number INTEGER NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_quotation_seq ON QUOTATION_SEQUENCE(year, seq_number);

@@ -205,6 +205,54 @@ class TestInvoiceSystem(unittest.TestCase):
         self.assertEqual(len(set(invoice_numbers)), 10, "Duplicate invoice numbers detected under concurrent threads!")
         print("Success: Checked unique sequence numbers for parallel creations.")
 
+    def test_e_quotation_flow_and_calculation(self):
+        print("\n=== Testing Quotation Flow & Calculations ===")
+        
+        # Import QuotationService here
+        from app.services.quotation_service import QuotationService
+        
+        # Fetch some active product
+        product = query_db(
+            """SELECT p.id, p.part_number, i.current_stock, c.price_per_100_pcs 
+               FROM PRODUCTS p
+               JOIN INVENTORY i ON p.id = i.product_id
+               JOIN PRODUCT_COSTS c ON p.id = c.product_id AND c.is_current = 1
+               LIMIT 1""", one=True
+        )
+        self.assertIsNotNone(product, "No products found to run quotation test.")
+        
+        customer_data = {
+            "name": "Quotation Client",
+            "discount_percentage": 5.0,
+            "gst_number": "27CCCCCC9999C3Z3",
+            "payment_terms": "Net 45"
+        }
+        
+        items_data = [
+            {
+                "product_id": product['id'],
+                "quantity": 200,
+                "discount_percentage": 10.0 # override default
+            }
+        ]
+        
+        # Create quotation
+        quotation_id = QuotationService.generate_quotation(customer_data, items_data, "2026-07-31")
+        self.assertIsNotNone(quotation_id)
+        
+        qtn = QuotationService.get_quotation_by_id(quotation_id)
+        print(f"Generated Quotation Number: {qtn['quotation_number']} | Date: {qtn['created_at'][:10]}")
+        self.assertEqual(qtn['quotation_number'][:4], "QTN-")
+        self.assertEqual(qtn['order']['customer_name_snapshot'], "Quotation Client")
+        self.assertEqual(len(qtn['items']), 1)
+        self.assertEqual(qtn['items'][0]['quantity'], 200)
+        self.assertEqual(qtn['items'][0]['discount_percentage'], 10.0)
+        
+        # Retrieve list
+        qtn_list = QuotationService.get_quotations()
+        self.assertGreaterEqual(len(qtn_list), 1)
+        print("Success: Verified quotation creation, pricing calculation overrides, and history retrieval.")
+
 # Helper queries
 def query_db(query, args=(), one=False):
     cur = g._database.cursor()
