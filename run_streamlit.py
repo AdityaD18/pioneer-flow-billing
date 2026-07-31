@@ -646,70 +646,36 @@ with t_inventory:
     if len(stocked_items) == 0:
         st.info("No stock records found matching your filters.")
     else:
-        st.markdown('<div class="panel">', unsafe_allow_html=True)
-        inv_rows = ""
+        df_display = []
         for p in stocked_items:
-            stock = p['current_stock'] or 0.0
-            purc = p['purc_orders_pending'] or 0.0
-            sales = p['sale_orders_due'] or 0.0
-            nett = p['nett_available'] or 0.0
-            reorder = p['reorder_level'] or 0.0
-            shortfall = p['short_fall'] or 0.0
-            min_reorder = p['min_reorder_qty'] or 0.0
-            order_to_place = p['order_to_be_placed'] or 0.0
+            df_display.append({
+                "Item Code": p['part_number'],
+                "Closing Stock (PCS)": int(p['current_stock'] or 0),
+                "Purc Orders Pending": int(p['purc_orders_pending'] or 0),
+                "Sale Orders Due": int(p['sale_orders_due'] or 0),
+                "Nett Available": int(p['nett_available'] or 0),
+                "Re-order Level": int(p['reorder_level'] or 0),
+                "Short fall": int(p['short_fall'] or 0),
+                "Min Reorder Qty": int(p['min_reorder_qty'] or 0),
+                "Order to be Placed": int(p['order_to_be_placed'] or 0)
+            })
             
-            # Badge style for shortfall
-            if shortfall > 0:
-                shortfall_cell = f"<span class='badge badge-red' style='font-weight:bold;'>{int(shortfall)} pcs</span>"
-            else:
-                shortfall_cell = "<span class='badge badge-green'>0</span>"
-                
-            # Badge style for Order to be Placed
-            if order_to_place > 0:
-                order_cell = f"<strong style='color:#f87171;'>{int(order_to_place)} pcs</strong>"
-            else:
-                order_cell = "<span style='color:#a1a1aa;'>-</span>"
-                
-            # Formatting stock badge
-            stock_badge = "badge-green" if stock >= reorder else "badge-amber"
-            if stock == 0:
-                stock_badge = "badge-red"
-                
-            inv_rows += f"""
-            <tr>
-                <td><strong>{p['part_number']}</strong></td>
-                <td><span class="badge {stock_badge}">{int(stock)} pcs</span></td>
-                <td>{int(purc)}</td>
-                <td>{int(sales)}</td>
-                <td><strong>{int(nett)}</strong></td>
-                <td>{int(reorder)}</td>
-                <td>{shortfall_cell}</td>
-                <td>{int(min_reorder)}</td>
-                <td>{order_cell}</td>
-            </tr>
-            """
-            
-        render_html(f"""
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Item Code</th>
-                    <th>Closing Stock</th>
-                    <th>Purc Pending</th>
-                    <th>Sale Due</th>
-                    <th>Nett Available</th>
-                    <th>Re-order Level</th>
-                    <th>Short fall</th>
-                    <th>Min Reorder</th>
-                    <th>Order Placed</th>
-                </tr>
-            </thead>
-            <tbody>
-                {inv_rows}
-            </tbody>
-        </table>
-        """)
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.dataframe(
+            pd.DataFrame(df_display), 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={
+                "Item Code": st.column_config.TextColumn("Item Code", width="medium"),
+                "Closing Stock (PCS)": st.column_config.NumberColumn("Closing Stock", format="%d"),
+                "Purc Orders Pending": st.column_config.NumberColumn("Purc Pending", format="%d"),
+                "Sale Orders Due": st.column_config.NumberColumn("Sale Due", format="%d"),
+                "Nett Available": st.column_config.NumberColumn("Nett Available", format="%d"),
+                "Re-order Level": st.column_config.NumberColumn("Re-order Level", format="%d"),
+                "Short fall": st.column_config.NumberColumn("Short fall", format="%d"),
+                "Min Reorder Qty": st.column_config.NumberColumn("Min Reorder Qty", format="%d"),
+                "Order to be Placed": st.column_config.NumberColumn("Order to be Placed", format="%d")
+            }
+        )
 
 # --- TAB: CUSTOMERS ---
 with t_customers:
