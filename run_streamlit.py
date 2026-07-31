@@ -660,6 +660,48 @@ with t_customers:
         st.markdown('</div>', unsafe_allow_html=True)
         
     with c_table:
+        # If editing a customer, display their specific invoice history
+        if editing_customer:
+            st.markdown(f"### Invoicing History: {editing_customer['name']}")
+            cust_invoices = query_db(
+                """SELECT i.*, o.grand_total, o.order_number 
+                   FROM INVOICES i
+                   JOIN ORDERS o ON i.order_id = o.id
+                   WHERE o.customer_id = ?
+                   ORDER BY i.invoice_date DESC""",
+                (editing_customer['id'],)
+            )
+            if len(cust_invoices) == 0:
+                st.info("No invoices have been generated for this customer yet.")
+            else:
+                inv_rows = ""
+                for inv in cust_invoices:
+                    inv_rows += f"""
+                    <tr>
+                        <td><strong>{inv['invoice_number']}</strong></td>
+                        <td>{inv['invoice_date']}</td>
+                        <td>{inv['order_number']}</td>
+                        <td><strong>₹{inv['grand_total']:.2f}</strong></td>
+                    </tr>
+                    """
+                st.markdown(f"""
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Invoice No</th>
+                            <th>Billing Date</th>
+                            <th>Order Ref</th>
+                            <th>Grand Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {inv_rows}
+                    </tbody>
+                </table>
+                """, unsafe_allow_html=True)
+            st.markdown("<br><hr><br>", unsafe_allow_html=True)
+            
+        st.markdown("### Customer Registry")
         if len(customers) == 0:
             st.info("No customers profiles registered yet.")
         else:

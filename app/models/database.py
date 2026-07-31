@@ -1,5 +1,6 @@
 import os
 import sqlite3
+from datetime import datetime
 from flask import g
 
 DATABASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'db'))
@@ -7,7 +8,7 @@ DATABASE_PATH = os.path.join(DATABASE_DIR, 'database.db')
 SCHEMA_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'database', 'schema.sql'))
 
 def init_db():
-    """Initializes the database using the schema.sql script."""
+    """Initializes the database using the schema.sql script and seeds default customer data if empty."""
     os.makedirs(DATABASE_DIR, exist_ok=True)
     os.makedirs(os.path.abspath(os.path.join(DATABASE_DIR, '..', 'uploads')), exist_ok=True)
     os.makedirs(os.path.abspath(os.path.join(DATABASE_DIR, '..', 'exports')), exist_ok=True)
