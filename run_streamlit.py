@@ -457,70 +457,82 @@ with t_dash:
 
 # --- TAB: IMPORTS ---
 with t_imports:
-    st.markdown("### Upload Excel Worksheets")
-    c_left, c_right = st.columns(2)
+    st.markdown("### Upload Combined Excel Workbook")
     
-    with c_left:
-        st.markdown('<div class="panel">', unsafe_allow_html=True)
-        st.subheader("Import Inventory Sheet")
-        inv_file = st.file_uploader("Select Inventory Excel (.xlsx, .xls)", type=["xlsx", "xls"], key="inv_file")
-        inv_sheet = st.text_input("Worksheet Name", "Stock Group Reorder Status", key="inv_sheet")
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.subheader("Import Combined Inventory & Cost Workbook")
+    st.write("Upload a single Excel workbook (.xlsx, .xls) containing both the stock inventory and cost sheets.")
+    
+    combined_file = st.file_uploader("Select Pioneer Excel Workbook", type=["xlsx", "xls"], key="combined_file")
+    
+    col_sh1, col_sh2 = st.columns(2)
+    with col_sh1:
+        inv_sheet = st.text_input("Inventory Sheet Name", "Stock Group Reorder Status", key="inv_sheet")
+    with col_sh2:
+        cost_sheet = st.text_input("Price List Sheet Name", "PRICE LIST", key="cost_sheet")
         
-        if st.button("Parse & Upsert Stock Quantities", use_container_width=True):
-            if inv_file is None:
-                st.error("Please upload an Excel file first.")
-            else:
-                # Save temp file
-                temp_path = os.path.join("uploads", inv_file.name)
-                os.makedirs("uploads", exist_ok=True)
-                with open(temp_path, "wb") as f:
-                    f.write(inv_file.getvalue())
-                
-                with st.spinner("Processing upsert operations..."):
-                    res = ImportService.import_inventory(temp_path, sheet_name=inv_sheet, filename=inv_file.name)
-                    
-                if res['status'] == 'failed':
-                    st.error(f"Import Failed: {res['errors'][0] if res['errors'] else 'Unknown Error'}")
+    if st.button("Run Complete Import & Synchronization", use_container_width=True, type="primary"):
+        if combined_file is None:
+            st.error("Please upload an Excel workbook first.")
+        else:
+            # Save temp file
+            temp_path = os.path.join("uploads", combined_file.name)
+            os.makedirs("uploads", exist_ok=True)
+            with open(temp_path, "wb") as f:
+                f.write(combined_file.getvalue())
+            
+            # Progress tracking
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            # 1. Process Inventory
+            status_text.text("Importing stock inventory quantities...")
+            progress_bar.progress(25)
+            inv_res = ImportService.import_inventory(temp_path, sheet_name=inv_sheet, filename=combined_file.name)
+            
+            # 2. Process Costs
+            status_text.text("Importing product pricing lists...")
+            progress_bar.progress(60)
+            cost_res = ImportService.import_costs(temp_path, sheet_name=cost_sheet, filename=combined_file.name)
+            
+            progress_bar.progress(100)
+            status_text.text("Import synchronization finished.")
+            
+            # Show summary
+            col_res1, col_res2 = st.columns(2)
+            with col_res1:
+                st.markdown("#### Inventory Sync Summary")
+                if inv_res['status'] == 'failed':
+                    st.error(f"Inventory failed: {inv_res['errors'][0] if inv_res['errors'] else 'Unknown Error'}")
                 else:
-                    msg = st.success if res['status'] == 'success' else st.warning
-                    msg(f"Import complete! Successfully upserted {res['successful_records']} of {res['total_records']} records. (Failed: {res['failed_records']})")
-                    if res['errors']:
-                        with st.expander("Show skipped row errors"):
-                            st.write(res['errors'])
-                # cleanup temp file
-                try: os.remove(temp_path)
-                except: pass
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-    with c_right:
-        st.markdown('<div class="panel">', unsafe_allow_html=True)
-        st.subheader("Import Cost Sheets")
-        cost_file = st.file_uploader("Select Cost List Excel (.xlsx, .xls)", type=["xlsx", "xls"], key="cost_file")
-        cost_sheet = st.text_input("Worksheet Name", "PRICE LIST", key="cost_sheet")
-        
-        if st.button("Parse & Upsert Pricing Costs", use_container_width=True):
-            if cost_file is None:
-                st.error("Please upload an Excel file first.")
-            else:
-                temp_path = os.path.join("uploads", cost_file.name)
-                os.makedirs("uploads", exist_ok=True)
-                with open(temp_path, "wb") as f:
-                    f.write(cost_file.getvalue())
-                
-                with st.spinner("Processing price logs..."):
-                    res = ImportService.import_costs(temp_path, sheet_name=cost_sheet, filename=cost_file.name)
-                    
-                if res['status'] == 'failed':
-                    st.error(f"Import Failed: {res['errors'][0] if res['errors'] else 'Unknown Error'}")
+                    msg = st.success if inv_res['status'] == 'success' else st.warning
+                    msg(f"Stock Complete ({inv_res['status'].upper()})")
+                    st.write(f"- Processed: {inv_res['total_records']}")
+                    st.write(f"- Success: {inv_res['successful_records']}")
+                    st.write(f"- Failed: {inv_res['failed_records']}")
+                    if inv_res['errors']:
+                        with st.expander("Inventory Skip Log"):
+                            st.write(inv_res['errors'])
+                            
+            with col_res2:
+                st.markdown("#### Cost Sync Summary")
+                if cost_res['status'] == 'failed':
+                    st.error(f"Cost failed: {cost_res['errors'][0] if cost_res['errors'] else 'Unknown Error'}")
                 else:
-                    msg = st.success if res['status'] == 'success' else st.warning
-                    msg(f"Import complete! Successfully upserted {res['successful_records']} of {res['total_records']} pricing records. (Failed: {res['failed_records']})")
-                    if res['errors']:
-                        with st.expander("Show skipped row errors"):
-                            st.write(res['errors'])
-                try: os.remove(temp_path)
-                except: pass
-        st.markdown('</div>', unsafe_allow_html=True)
+                    msg = st.success if cost_res['status'] == 'success' else st.warning
+                    msg(f"Costs Complete ({cost_res['status'].upper()})")
+                    st.write(f"- Processed: {cost_res['total_records']}")
+                    st.write(f"- Success: {cost_res['successful_records']}")
+                    st.write(f"- Failed: {cost_res['failed_records']}")
+                    if cost_res['errors']:
+                        with st.expander("Cost Skip Log"):
+                            st.write(cost_res['errors'])
+                            
+            # clean up temp file
+            try: os.remove(temp_path)
+            except: pass
+            
+    st.markdown('</div>', unsafe_allow_html=True)
 
     st.subheader("Full Upload Sync History Log")
     all_logs = query_db("SELECT * FROM IMPORT_LOG ORDER BY imported_at DESC")

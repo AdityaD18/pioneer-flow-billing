@@ -20,6 +20,17 @@ def init_db():
         schema_sql = f.read()
     
     conn.executescript(schema_sql)
+    
+    # Seed 1 Demo Customer
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM CUSTOMERS")
+    if cursor.fetchone()[0] == 0:
+        now_str = datetime.now().isoformat()
+        cursor.execute(
+            "INSERT INTO CUSTOMERS (name, discount_percentage, gst_number, payment_terms, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("Demo1", 10.0, "27DEMO11234A1Z1", "Net 30 Days", now_str, now_str)
+        )
+    
     conn.commit()
     conn.close()
 
