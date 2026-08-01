@@ -1988,17 +1988,36 @@ with t_settings:
                         st.error(f"Sync failed: {', '.join(res['errors'])}")
                         
     st.markdown("<br>", unsafe_allow_html=True)
-    render_html('<div class="setting-section"><div class="setting-section-title"><i class="fa-solid fa-bolt"></i> Direct Tally Prime Live Sync (Port 9000)</div></div>')
-    st.caption("Pull live Stock Summary across all stock groups directly from Tally Prime running on Port 9000.")
+    render_html('<div class="setting-section"><div class="setting-section-title"><i class="fa-solid fa-bolt"></i> Direct Tally Prime Live Sync (Port 9000 &amp; XML Upload)</div></div>')
+    st.caption("Sync live Stock Summary across all stock groups directly from Tally Prime 7.1.")
     tally_port_url = st.text_input("Tally Prime HTTP Server URL", value="http://localhost:9000", key="tally_port_url_setting")
-    if st.button("⚡ Sync Live Data Directly from Tally Prime 7.1", type="primary", use_container_width=True, key="sync_tally_port_btn"):
-        with st.spinner("Connecting to Tally Prime on Port 9000 and parsing live stock summary..."):
-            t_res = ImportService.sync_from_tally_port(tally_port_url.strip(), imported_by="Direct Tally Admin Sync")
-            if t_res['status'] in ('success', 'partial_success'):
-                trigger_toast(f"Tally Prime sync successful! Imported {t_res['successful_records']} items live across all stock groups.", icon="⚡")
-                st.rerun()
-            else:
-                st.error(f"Tally Sync Failed: {', '.join(t_res['errors'])}")
+    st.caption("ℹ️ *Note: `http://localhost:9000` connects directly when running on your local Tally PC. If using Streamlit Cloud, upload your Tally XML export file below or enter your public Ngrok/Cloudflare tunnel URL.*")
+    
+    col_tally_1, col_tally_2 = st.columns([1, 1])
+    with col_tally_1:
+        if st.button("⚡ Sync Directly from Tally Port 9000", type="primary", use_container_width=True, key="sync_tally_port_btn"):
+            with st.spinner("Connecting to Tally Prime on Port 9000 and parsing live stock summary..."):
+                t_res = ImportService.sync_from_tally_port(tally_port_url.strip(), imported_by="Direct Tally Admin Sync")
+                if t_res['status'] in ('success', 'partial_success'):
+                    trigger_toast(f"Tally Prime sync successful! Imported {t_res['successful_records']} items live across all stock groups.", icon="⚡")
+                    st.rerun()
+                else:
+                    st.error(f"Tally Sync Failed: {', '.join(t_res['errors'])}")
+                    
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.write("**Or 1-Click Upload Tally Export XML File (.xml):**")
+    tally_xml_file = st.file_uploader("Select Tally Stock Summary XML File", type=["xml"], key="tally_xml_file_uploader")
+    if st.button("Run Tally XML File Import", use_container_width=True, type="primary", key="import_tally_xml_btn"):
+        if tally_xml_file is None:
+            st.error("Please upload a valid Tally XML file first.")
+        else:
+            with st.spinner("Parsing Tally XML stock summary..."):
+                t_res = ImportService.import_from_tally_xml(tally_xml_file.getvalue(), filename=tally_xml_file.name, imported_by="Manual Tally XML Upload")
+                if t_res['status'] in ('success', 'partial_success'):
+                    trigger_toast(f"Tally XML import successful! Loaded {t_res['successful_records']} items across all stock groups.", icon="⚡")
+                    st.rerun()
+                else:
+                    st.error(f"Tally XML Import Failed: {', '.join(t_res['errors'])}")
                         
     st.markdown("<br>", unsafe_allow_html=True)
     render_html('<div class="setting-section"><div class="setting-section-title"><i class="fa-solid fa-file-arrow-up"></i> Import Price List</div></div>')
