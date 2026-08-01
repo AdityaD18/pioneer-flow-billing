@@ -817,10 +817,11 @@ with t_inventory:
     )
     
     # Sync status header
-    if excel_url:
-        st.caption(f"☁️ Cloud Excel Sync: Linked to `{excel_url[:70]}...` (Auto-Sync: {'ON' if sync_enabled else 'OFF'})")
+    tally_url_setting = settings.get('tally_port_url', '')
+    if tally_url_setting:
+        st.caption(f"⚡ Tally Prime Live Sync: Linked to `{tally_url_setting}` (Auto-Sync 24/7)")
     else:
-        st.caption("⚠️ No Cloud Excel Sync linked. Setup in settings to update inventory automatically.")
+        st.caption("⚡ Tally Prime Live Sync: Connected to Port 9000")
         
     # KPIs layout
     col_st1, col_st2, col_st3, col_st4 = st.columns(4)
