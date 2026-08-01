@@ -234,6 +234,102 @@ class ImportService:
         }
 
     @classmethod
+    def import_customers_excel(cls, file_path_or_bytes, filename='customers.xlsx', imported_by='Admin'):
+        """Import customers from Excel or CSV file."""
+        import pandas as pd
+        from app.models.database import get_db_connection
+        
+        try:
+            if isinstance(file_path_or_bytes, bytes):
+                df = pd.read_excel(BytesIO(file_path_or_bytes)) if filename.endswith(('.xlsx', '.xls')) else pd.read_csv(BytesIO(file_path_or_bytes))
+            elif hasattr(file_path_or_bytes, 'read'):
+                file_path_or_bytes.seek(0)
+                b_content = file_path_or_bytes.read()
+                df = pd.read_excel(BytesIO(b_content)) if filename.endswith(('.xlsx', '.xls')) else pd.read_csv(BytesIO(b_content))
+            else:
+                df = pd.read_excel(file_path_or_bytes) if filename.endswith(('.xlsx', '.xls')) else pd.read_csv(file_path_or_bytes)
+        except Exception as e:
+            return {"status": "failed", "total_records": 0, "successful_records": 0, "failed_records": 0, "errors": [f"Failed to read customer file: {str(e)}"]}
+            
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("BEGIN TRANSACTION;")
+        
+        total_records = len(df)
+        successful_records = 0
+        failed_records = 0
+        errors = []
+        
+        col_map = {}
+        for col in df.columns:
+            c_low = str(col).strip().lower()
+            if any(k in c_low for k in ['customer', 'party', 'client', 'name', 'company']):
+                if 'name' not in col_map: col_map['name'] = col
+            elif any(k in c_low for k in ['disc', 'discount', 'dis %', 'margin']):
+                col_map['discount'] = col
+            elif 'phone' in c_low or 'mobile' in c_low or 'contact' in c_low:
+                col_map['phone'] = col
+            elif 'email' in c_low:
+                col_map['email'] = col
+            elif 'gst' in c_low:
+                col_map['gstin'] = col
+            elif 'address' in c_low or 'location' in c_low:
+                col_map['address'] = col
+                
+        name_col = col_map.get('name')
+        if not name_col:
+            conn.close()
+            return {"status": "failed", "total_records": 0, "successful_records": 0, "failed_records": 0, "errors": ["Could not identify Customer Name column in file."]}
+            
+        for idx, row in df.iterrows():
+            savepoint_name = f"sp_cust_{idx}"
+            try:
+                cur.execute(f"SAVEPOINT {savepoint_name};")
+                c_name = str(row[name_col]).strip() if pd.notna(row[name_col]) else ""
+                if not c_name or c_name.lower() in ('nan', 'total', 'grand total'):
+                    cur.execute(f"RELEASE SAVEPOINT {savepoint_name};")
+                    continue
+                    
+                disc_val = 0.0
+                if 'discount' in col_map and pd.notna(row[col_map['discount']]):
+                    disc_val = parse_float_or_none(row[col_map['discount']]) or 0.0
+                    
+                phone_val = str(row[col_map['phone']]).strip() if 'phone' in col_map and pd.notna(row[col_map['phone']]) else ""
+                email_val = str(row[col_map['email']]).strip() if 'email' in col_map and pd.notna(row[col_map['email']]) else ""
+                gstin_val = str(row[col_map['gstin']]).strip() if 'gstin' in col_map and pd.notna(row[col_map['gstin']]) else ""
+                addr_val = str(row[col_map['address']]).strip() if 'address' in col_map and pd.notna(row[col_map['address']]) else ""
+                
+                cur.execute("SELECT id FROM CUSTOMERS WHERE LOWER(name) = LOWER(?)", (c_name,))
+                existing = cur.fetchone()
+                if existing:
+                    cur.execute(
+                        "UPDATE CUSTOMERS SET discount_percent = ?, phone = ?, email = ?, gstin = ?, address = ? WHERE id = ?",
+                        (disc_val, phone_val, email_val, gstin_val, addr_val, existing['id'])
+                    )
+                else:
+                    cur.execute(
+                        "INSERT INTO CUSTOMERS (name, discount_percent, phone, email, gstin, address) VALUES (?, ?, ?, ?, ?, ?)",
+                        (c_name, disc_val, phone_val, email_val, gstin_val, addr_val)
+                    )
+                cur.execute(f"RELEASE SAVEPOINT {savepoint_name};")
+                successful_records += 1
+            except Exception as r_err:
+                try: cur.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name};")
+                except: pass
+                failed_records += 1
+                errors.append(f"Row {idx+2}: {str(r_err)}")
+                
+        cur.execute("COMMIT;")
+        conn.close()
+        
+        status = 'success' if failed_records == 0 else ('partial_success' if successful_records > 0 else 'failed')
+        execute_db(
+            "INSERT INTO IMPORT_LOG (import_type, filename, total_records, successful_records, failed_records, imported_by, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            ('customers', filename, total_records, successful_records, failed_records, imported_by, status)
+        )
+        return {"status": status, "total_records": total_records, "successful_records": successful_records, "failed_records": failed_records, "errors": errors[:50]}
+
+    @classmethod
     def sync_from_web_url(cls, url, imported_by='Auto Sync'):
         """Downloads an Excel spreadsheet from a remote web URL and imports it in-memory."""
         import urllib.request
@@ -615,6 +711,38 @@ class ImportService:
                 except: pass
                 failed_records += 1
                 errors.append(f"Item {item_code}: {str(row_error)}")
+                
+        # Also parse LEDGER elements if present in Tally XML (Master Export)
+        tally_ledgers = root.findall('.//LEDGER')
+        for idx_l, leg in enumerate(tally_ledgers):
+            c_name = leg.attrib.get('NAME') or leg.findtext('NAME')
+            if not c_name:
+                nl = leg.find('.//LANGUAGENAME.LIST/NAME.LIST/NAME')
+                if nl is not None: c_name = nl.text
+            if not c_name: continue
+            c_name = c_name.strip()
+            if not c_name or c_name.lower() in ('nan', 'total'): continue
+            
+            gstin = leg.findtext('PARTYGSTIN') or leg.findtext('GSTIN') or ""
+            phone = leg.findtext('LEDGERPHONE') or leg.findtext('MOBILE') or ""
+            email = leg.findtext('EMAIL') or ""
+            addr_list = [a.text for a in leg.findall('.//ADDRESS') if a is not None and a.text]
+            address = "\n".join(addr_list) if addr_list else ""
+            
+            sp_leg = f"sp_leg_{idx_l}"
+            try:
+                cur.execute(f"SAVEPOINT {sp_leg};")
+                cur.execute("SELECT id FROM CUSTOMERS WHERE LOWER(name) = LOWER(?)", (c_name,))
+                ex = cur.fetchone()
+                if ex:
+                    cur.execute("UPDATE CUSTOMERS SET gstin = ?, phone = ?, email = ?, address = ? WHERE id = ?", (gstin, phone, email, address, ex['id']))
+                else:
+                    cur.execute("INSERT INTO CUSTOMERS (name, discount_percent, phone, email, gstin, address) VALUES (?, ?, ?, ?, ?, ?)", (c_name, 0.0, phone, email, gstin, address))
+                cur.execute(f"RELEASE SAVEPOINT {sp_leg};")
+                successful_records += 1
+            except Exception:
+                try: cur.execute(f"ROLLBACK TO SAVEPOINT {sp_leg};")
+                except: pass
                 
         cur.execute("COMMIT;")
         conn.close()

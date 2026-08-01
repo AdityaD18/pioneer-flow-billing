@@ -1957,44 +1957,15 @@ with t_settings:
     
     render_html('<div class="setting-section"><div class="setting-section-title"><i class="fa-solid fa-percent"></i> General Tax Configuration</div></div>')
     new_gst_rate = st.number_input("Default GST Percentage (%)", min_value=0.0, max_value=100.0, step=0.1, value=current_gst)
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    render_html('<div class="setting-section"><div class="setting-section-title"><i class="fa-solid fa-cloud"></i> Stock Excel Cloud Sync</div></div>')
-    st.caption("Link your Stock Group Reorder Excel file. Upload to Google Drive/OneDrive, share as 'Anyone with link can view', and paste the URL below.")
-    new_url = st.text_input("Excel / Google Sheets Share URL", value=current_url, placeholder="https://docs.google.com/spreadsheets/d/...")
-    new_sync_enabled = st.checkbox("Enable 24/7 Background Auto-Sync", value=current_sync_enabled)
-    new_interval = st.number_input("Auto-Sync Interval (Minutes)", min_value=1.0, max_value=1440.0, step=1.0, value=current_interval)
-    
-    col_set1, col_set2 = st.columns([1, 1])
-    with col_set1:
-        if st.button("Apply Config Settings", type="primary", use_container_width=True):
-            execute_db("INSERT OR REPLACE INTO APP_SETTINGS (key, value) VALUES ('gst_rate', ?)", (str(new_gst_rate),))
-            execute_db("INSERT OR REPLACE INTO APP_SETTINGS (key, value) VALUES ('stock_excel_url', ?)", (str(new_url),))
-            execute_db("INSERT OR REPLACE INTO APP_SETTINGS (key, value) VALUES ('auto_sync_enabled', ?)", ('1' if new_sync_enabled else '0',))
-            execute_db("INSERT OR REPLACE INTO APP_SETTINGS (key, value) VALUES ('auto_sync_interval', ?)", (str(new_interval),))
-            trigger_toast("Settings updated successfully!", icon="⚙️")
-            st.rerun()
+    if st.button("Apply Config Settings", type="primary", use_container_width=True, key="save_tax_config_btn"):
+        execute_db("INSERT OR REPLACE INTO APP_SETTINGS (key, value) VALUES ('gst_rate', ?)", (str(new_gst_rate),))
+        trigger_toast("Settings updated successfully!", icon="⚙️")
+        st.rerun()
             
-    with col_set2:
-        if st.button("Sync Stock Status Now", use_container_width=True):
-            if not new_url.strip():
-                st.error("Please configure a valid Excel Share URL first.")
-            else:
-                with st.spinner("Downloading and parsing Excel sheet from cloud..."):
-                    res = ImportService.sync_from_web_url(new_url.strip(), imported_by="Manual Admin Sync")
-                    if res['status'] in ('success', 'partial_success'):
-                        msg = f"Stock status synced successfully! Loaded {res['successful_records']} rows."
-                        if res['failed_records'] > 0:
-                            msg += f" ({res['failed_records']} rows failed)"
-                        trigger_toast(msg, icon="🔄")
-                        st.rerun()
-                    else:
-                        st.error(f"Sync failed: {', '.join(res['errors'])}")
-                        
     st.markdown("<br>", unsafe_allow_html=True)
     render_html('<div class="setting-section"><div class="setting-section-title"><i class="fa-solid fa-bolt"></i> Direct Tally Prime Live Sync (Port 9000 &amp; XML Upload)</div></div>')
     st.caption("Sync live Stock Summary across all stock groups directly from Tally Prime 7.1.")
-    tally_port_url = st.text_input("Tally Prime HTTP Server URL", value="http://localhost:9000", key="tally_port_url_setting")
+    tally_port_url = st.text_input("Tally Prime HTTP Server URL", value=settings.get('tally_port_url', 'http://localhost:9000'), key="tally_port_url_setting")
     st.caption("ℹ️ *Note: `http://localhost:9000` connects directly when running on your local Tally PC. If using Streamlit Cloud, upload your Tally XML export file below or enter your public Ngrok/Cloudflare tunnel URL.*")
     
     col_tally_1, col_tally_2 = st.columns([1, 1])
@@ -2046,3 +2017,22 @@ with t_settings:
             else:
                 trigger_toast(f"Price list sync successful! Loaded {cost_res['successful_records']} items.", icon="✅")
                 st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    render_html('<div class="setting-section"><div class="setting-section-title"><i class="fa-solid fa-users"></i> Import Customer Directory</div></div>')
+    st.caption("Upload an Excel, CSV, or Tally XML file containing Customer / Party names and profiles.")
+    cust_file = st.file_uploader("Select Customer Master File (.xlsx, .csv, .xml)", type=["xlsx", "xls", "csv", "xml"], key="settings_cust_file")
+    if st.button("Run Customer Import", use_container_width=True, type="primary", key="settings_import_cust_btn"):
+        if cust_file is None:
+            st.error("Please select a customer file to upload first.")
+        else:
+            with st.spinner("Importing customer profiles..."):
+                if cust_file.name.endswith('.xml'):
+                    c_res = ImportService.import_from_tally_xml(cust_file.getvalue(), filename=cust_file.name, imported_by="Customer XML Import")
+                else:
+                    c_res = ImportService.import_customers_excel(cust_file.getvalue(), filename=cust_file.name, imported_by="Customer Excel Import")
+            if c_res['status'] in ('success', 'partial_success'):
+                trigger_toast(f"Customer import successful! Imported/updated {c_res['successful_records']} customer profiles.", icon="👥")
+                st.rerun()
+            else:
+                st.error(f"Customer import failed: {', '.join(c_res['errors'])}")
