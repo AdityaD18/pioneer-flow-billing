@@ -458,3 +458,220 @@ class ImportService:
             "failed_records": failed_records,
             "errors": errors[:50]
         }
+
+    @classmethod
+    def import_from_tally_xml(cls, xml_data, filename='tally_live.xml', imported_by='Tally Live Sync'):
+        """Parses Tally Prime Stock Summary XML and imports stock levels and rates into SQLite."""
+        import xml.etree.ElementTree as ET
+        
+        if isinstance(xml_data, bytes):
+            xml_str = xml_data.decode('utf-8', errors='ignore')
+        else:
+            xml_str = str(xml_data)
+            
+        xml_clean = re.sub(r'&(?!amp;|lt;|gt;|apos;|quot;)', '&amp;', xml_str)
+        
+        try:
+            root = ET.fromstring(xml_clean)
+        except Exception as ex:
+            return {
+                "status": "failed",
+                "total_records": 0,
+                "successful_records": 0,
+                "failed_records": 0,
+                "errors": [f"Invalid Tally XML structure: {str(ex)}"]
+            }
+            
+        acc_names = root.findall('.//DSPACCNAME')
+        stk_infos = root.findall('.//DSPSTKINFO')
+        
+        if not acc_names or not stk_infos:
+            return {
+                "status": "failed",
+                "total_records": 0,
+                "successful_records": 0,
+                "failed_records": 0,
+                "errors": ["No Stock Summary item blocks found in Tally XML response."]
+            }
+            
+        total_records = min(len(acc_names), len(stk_infos))
+        successful_records = 0
+        failed_records = 0
+        errors = []
+        
+        conn = get_db_connection()
+        conn.isolation_level = None
+        cur = conn.cursor()
+        cur.execute("BEGIN TRANSACTION;")
+        
+        for idx in range(total_records):
+            a_el = acc_names[idx]
+            s_el = stk_infos[idx]
+            
+            name_el = a_el.find('.//DSPDISPNAME')
+            qty_el = s_el.find('.//DSPCLQTY')
+            rate_el = s_el.find('.//DSPCLRATE')
+            
+            if name_el is None or not name_el.text:
+                continue
+                
+            item_code = name_el.text.strip()
+            if not item_code or item_code.lower() == 'nan' or item_code.lower() == 'total':
+                continue
+                
+            qty_str = qty_el.text.strip() if qty_el is not None and qty_el.text else '0'
+            rate_str = rate_el.text.strip() if rate_el is not None and rate_el.text else '0'
+            
+            # parse numeric stock
+            m_qty = re.search(r'[-+]?\d*\.?\d+', qty_str.replace(',', ''))
+            stock_val = float(m_qty.group(0)) if m_qty else 0.0
+            
+            # parse numeric rate
+            m_rate = re.search(r'[-+]?\d*\.?\d+', rate_str.replace(',', ''))
+            rate_val = float(m_rate.group(0)) if m_rate else 0.0
+            
+            savepoint_name = f"sp_tally_{idx}"
+            try:
+                cur.execute(f"SAVEPOINT {savepoint_name};")
+                
+                # 1. Upsert product
+                cur.execute("SELECT id FROM PRODUCTS WHERE part_number = ?", (item_code,))
+                prod = cur.fetchone()
+                if prod is None:
+                    series = item_code.split('-')[0] if '-' in item_code else None
+                    cur.execute(
+                        "INSERT INTO PRODUCTS (part_number, part_name, series, make) VALUES (?, ?, ?, ?)",
+                        (item_code, item_code, series, 'WAGO')
+                    )
+                    product_id = cur.lastrowid
+                else:
+                    product_id = prod['id']
+                    
+                # 2. Upsert inventory stock level
+                cur.execute("SELECT purc_orders_pending, sale_orders_due, reorder_level, min_reorder_qty FROM INVENTORY WHERE product_id = ?", (product_id,))
+                inv = cur.fetchone()
+                
+                purc_val = inv['purc_orders_pending'] if inv and inv['purc_orders_pending'] else 0.0
+                sales_val = inv['sale_orders_due'] if inv and inv['sale_orders_due'] else 0.0
+                reorder_val = inv['reorder_level'] if inv and inv['reorder_level'] else 0.0
+                min_reorder_val = inv['min_reorder_qty'] if inv and inv['min_reorder_qty'] else 0.0
+                
+                nett_val = stock_val + purc_val - sales_val
+                shortfall_val = max(0.0, reorder_val - nett_val)
+                order_to_place_val = max(shortfall_val, min_reorder_val) if shortfall_val > 0 else 0.0
+                
+                if inv is None:
+                    cur.execute(
+                        """INSERT INTO INVENTORY (
+                            product_id, current_stock, purc_orders_pending, sale_orders_due,
+                            nett_available, reorder_level, short_fall, min_reorder_qty,
+                            order_to_be_placed, last_updated
+                           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            product_id, stock_val, purc_val, sales_val,
+                            nett_val, reorder_val, shortfall_val, min_reorder_val,
+                            order_to_place_val, datetime.now().isoformat()
+                        )
+                    )
+                else:
+                    cur.execute(
+                        """UPDATE INVENTORY SET 
+                            current_stock = ?, nett_available = ?, short_fall = ?, 
+                            order_to_be_placed = ?, last_updated = ? 
+                           WHERE product_id = ?""",
+                        (
+                            stock_val, nett_val, shortfall_val, 
+                            order_to_place_val, datetime.now().isoformat(), product_id
+                        )
+                    )
+                    
+                # 3. Update cost rate if present in Tally
+                if rate_val > 0:
+                    price_per_100 = rate_val
+                    price_per_unit = rate_val / 100.0
+                    
+                    cur.execute("SELECT id, price_per_100_pcs FROM PRODUCT_COSTS WHERE product_id = ? AND is_current = 1", (product_id,))
+                    active_cost = cur.fetchone()
+                    
+                    price_changed = True
+                    if active_cost and abs(active_cost['price_per_100_pcs'] - price_per_100) < 0.001:
+                        price_changed = False
+                        
+                    if price_changed:
+                        if active_cost:
+                            cur.execute(
+                                "UPDATE PRODUCT_COSTS SET is_current = 0, effective_to = ? WHERE id = ?",
+                                (datetime.now().isoformat(), active_cost['id'])
+                            )
+                        cur.execute(
+                            "INSERT INTO PRODUCT_COSTS (product_id, price_per_100_pcs, price_per_unit, effective_from, is_current) VALUES (?, ?, ?, ?, ?)",
+                            (product_id, price_per_100, price_per_unit, datetime.now().isoformat(), 1)
+                        )
+                
+                cur.execute(f"RELEASE SAVEPOINT {savepoint_name};")
+                successful_records += 1
+            except Exception as row_error:
+                try: cur.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name};")
+                except: pass
+                failed_records += 1
+                errors.append(f"Item {item_code}: {str(row_error)}")
+                
+        cur.execute("COMMIT;")
+        conn.close()
+        
+        status = 'success'
+        if failed_records > 0:
+            status = 'partial_success' if successful_records > 0 else 'failed'
+            
+        execute_db(
+            "INSERT INTO IMPORT_LOG (import_type, filename, total_records, successful_records, failed_records, imported_by, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            ('inventory', filename, total_records, successful_records, failed_records, imported_by, status)
+        )
+        
+        return {
+            "status": status,
+            "total_records": total_records,
+            "successful_records": successful_records,
+            "failed_records": failed_records,
+            "errors": errors[:50]
+        }
+
+    @classmethod
+    def sync_from_tally_port(cls, tally_url='http://localhost:9000', imported_by='Tally Live Sync'):
+        """Connects directly to Tally Prime XML HTTP Server and imports live Stock Summary."""
+        import urllib.request
+        
+        tdl_query = b"""<ENVELOPE>
+  <HEADER>
+    <TALLYREQUEST>Export Data</TALLYREQUEST>
+  </HEADER>
+  <BODY>
+    <EXPORTDATA>
+      <REQUESTDESC>
+        <REPORTNAME>Stock Summary</REPORTNAME>
+        <STATICVARIABLES>
+          <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
+          <ISITEMWISE>Yes</ISITEMWISE>
+        </STATICVARIABLES>
+      </REQUESTDESC>
+    </EXPORTDATA>
+  </BODY>
+</ENVELOPE>"""
+        try:
+            req = urllib.request.Request(
+                tally_url.strip(),
+                data=tdl_query,
+                headers={'Content-Type': 'text/xml'}
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                xml_data = resp.read()
+                
+            return cls.import_from_tally_xml(xml_data, filename='tally_port_9000.xml', imported_by=imported_by)
+        except Exception as ex:
+            return {
+                "status": "failed",
+                "total_records": 0,
+                "successful_records": 0,
+                "failed_records": 0,
+                "errors": [f"Failed to connect to Tally Prime on {tally_url}: {str(ex)}"]
+            }

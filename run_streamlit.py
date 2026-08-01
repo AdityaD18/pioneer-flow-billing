@@ -1988,6 +1988,19 @@ with t_settings:
                         st.error(f"Sync failed: {', '.join(res['errors'])}")
                         
     st.markdown("<br>", unsafe_allow_html=True)
+    render_html('<div class="setting-section"><div class="setting-section-title"><i class="fa-solid fa-bolt"></i> Direct Tally Prime Live Sync (Port 9000)</div></div>')
+    st.caption("Pull live Stock Summary across all stock groups directly from Tally Prime running on Port 9000.")
+    tally_port_url = st.text_input("Tally Prime HTTP Server URL", value="http://localhost:9000", key="tally_port_url_setting")
+    if st.button("⚡ Sync Live Data Directly from Tally Prime 7.1", type="primary", use_container_width=True, key="sync_tally_port_btn"):
+        with st.spinner("Connecting to Tally Prime on Port 9000 and parsing live stock summary..."):
+            t_res = ImportService.sync_from_tally_port(tally_port_url.strip(), imported_by="Direct Tally Admin Sync")
+            if t_res['status'] in ('success', 'partial_success'):
+                trigger_toast(f"Tally Prime sync successful! Imported {t_res['successful_records']} items live across all stock groups.", icon="⚡")
+                st.rerun()
+            else:
+                st.error(f"Tally Sync Failed: {', '.join(t_res['errors'])}")
+                        
+    st.markdown("<br>", unsafe_allow_html=True)
     render_html('<div class="setting-section"><div class="setting-section-title"><i class="fa-solid fa-file-arrow-up"></i> Import Price List</div></div>')
     st.caption("Upload the Excel workbook (.xlsx, .xls) containing the pricing list sheet to update system costs.")
     price_file = st.file_uploader("Select Price List Excel Workbook", type=["xlsx", "xls"], key="price_file")
