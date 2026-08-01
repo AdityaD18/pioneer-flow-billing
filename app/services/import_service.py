@@ -581,16 +581,17 @@ class ImportService:
         acc_names = root.findall('.//DSPACCNAME')
         stk_infos = root.findall('.//DSPSTKINFO')
         
-        if not acc_names or not stk_infos:
+        tally_ledgers = root.findall('.//LEDGER')
+        if not acc_names and not tally_ledgers:
             return {
                 "status": "failed",
                 "total_records": 0,
                 "successful_records": 0,
                 "failed_records": 0,
-                "errors": ["No Stock Summary item blocks found in Tally XML response."]
+                "errors": ["No Stock Summary or Ledger blocks found in Tally XML response."]
             }
             
-        total_records = min(len(acc_names), len(stk_infos))
+        total_records = min(len(acc_names), len(stk_infos)) if (acc_names and stk_infos) else 0
         successful_records = 0
         failed_records = 0
         errors = []
@@ -723,6 +724,11 @@ class ImportService:
             c_name = c_name.strip()
             if not c_name or c_name.lower() in ('nan', 'total'): continue
             
+            parent_grp = (leg.findtext('PARENT') or "").strip().lower()
+            # Filter to only customer/debtor ledgers
+            if parent_grp and not any(kw in parent_grp for kw in ['debtor', 'customer']):
+                continue
+            
             gstin = leg.findtext('PARTYGSTIN') or leg.findtext('GSTIN') or ""
             phone = leg.findtext('LEDGERPHONE') or leg.findtext('MOBILE') or ""
             email = leg.findtext('EMAIL') or ""
@@ -735,9 +741,10 @@ class ImportService:
                 cur.execute("SELECT id FROM CUSTOMERS WHERE LOWER(name) = LOWER(?)", (c_name,))
                 ex = cur.fetchone()
                 if ex:
-                    cur.execute("UPDATE CUSTOMERS SET gstin = ?, phone = ?, email = ?, address = ? WHERE id = ?", (gstin, phone, email, address, ex['id']))
+                    if gstin:
+                        cur.execute("UPDATE CUSTOMERS SET gst_number = ? WHERE id = ?", (gstin, ex['id']))
                 else:
-                    cur.execute("INSERT INTO CUSTOMERS (name, discount_percent, phone, email, gstin, address) VALUES (?, ?, ?, ?, ?, ?)", (c_name, 0.0, phone, email, gstin, address))
+                    cur.execute("INSERT INTO CUSTOMERS (name, discount_percentage, gst_number) VALUES (?, ?, ?)", (c_name, 0.0, gstin))
                 cur.execute(f"RELEASE SAVEPOINT {sp_leg};")
                 successful_records += 1
             except Exception:
@@ -766,10 +773,10 @@ class ImportService:
 
     @classmethod
     def sync_from_tally_port(cls, tally_url='http://localhost:9000', imported_by='Tally Live Sync'):
-        """Connects directly to Tally Prime XML HTTP Server and imports live Stock Summary."""
+        """Connects directly to Tally Prime XML HTTP Server and imports live Stock Summary & Customers."""
         import urllib.request
         
-        tdl_query = b"""<ENVELOPE>
+        tdl_stock_query = b"""<ENVELOPE>
   <HEADER>
     <TALLYREQUEST>Export Data</TALLYREQUEST>
   </HEADER>
@@ -785,16 +792,52 @@ class ImportService:
     </EXPORTDATA>
   </BODY>
 </ENVELOPE>"""
+
+        tdl_ledger_query = b"""<ENVELOPE>
+  <HEADER>
+    <VERSION>1</VERSION>
+    <TALLYREQUEST>Export</TALLYREQUEST>
+    <TYPE>Collection</TYPE>
+    <ID>LedgerColl</ID>
+  </HEADER>
+  <BODY>
+    <DESC>
+      <STATICVARIABLES>
+        <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
+      </STATICVARIABLES>
+      <TDL>
+        <TDLMESSAGE>
+          <COLLECTION NAME="LedgerColl" ISINITIALIZE="Yes">
+            <TYPE>Ledger</TYPE>
+            <NATIVEMETHOD>Name</NATIVEMETHOD>
+            <NATIVEMETHOD>Parent</NATIVEMETHOD>
+            <NATIVEMETHOD>PartyGSTIN</NATIVEMETHOD>
+            <NATIVEMETHOD>LedgerPhone</NATIVEMETHOD>
+            <NATIVEMETHOD>Email</NATIVEMETHOD>
+          </COLLECTION>
+        </TDLMESSAGE>
+      </TDL>
+    </DESC>
+  </BODY>
+</ENVELOPE>"""
         try:
-            req = urllib.request.Request(
-                tally_url.strip(),
-                data=tdl_query,
-                headers={'Content-Type': 'text/xml'}
-            )
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                xml_data = resp.read()
+            # 1. Fetch Stock Summary
+            req_stock = urllib.request.Request(tally_url.strip(), data=tdl_stock_query, headers={'Content-Type': 'text/xml'})
+            with urllib.request.urlopen(req_stock, timeout=15) as resp:
+                xml_stock_data = resp.read()
                 
-            return cls.import_from_tally_xml(xml_data, filename='tally_port_9000.xml', imported_by=imported_by)
+            res_stock = cls.import_from_tally_xml(xml_stock_data, filename='tally_stock_9000.xml', imported_by=imported_by)
+            
+            # 2. Fetch Customer Ledgers
+            try:
+                req_ledger = urllib.request.Request(tally_url.strip(), data=tdl_ledger_query, headers={'Content-Type': 'text/xml'})
+                with urllib.request.urlopen(req_ledger, timeout=15) as resp:
+                    xml_ledger_data = resp.read()
+                cls.import_from_tally_xml(xml_ledger_data, filename='tally_ledgers_9000.xml', imported_by=imported_by)
+            except Exception:
+                pass
+                
+            return res_stock
         except Exception as ex:
             return {
                 "status": "failed",
