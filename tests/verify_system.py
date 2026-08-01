@@ -26,11 +26,14 @@ from app.services.invoice_service import InvoiceService
 class TestInvoiceSystem(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Ensure database is clean and initialized
-        if os.path.exists(DATABASE_PATH):
+        # Use an isolated test database for test runs to protect production db/database.db
+        test_db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'db', 'test_verification.db'))
+        import app.models.database as db_mod
+        db_mod.DATABASE_PATH = test_db_path
+        if os.path.exists(test_db_path):
             try:
-                os.remove(DATABASE_PATH)
-            except PermissionError:
+                os.remove(test_db_path)
+            except Exception:
                 pass
         init_db()
         if HAS_FLASK:
