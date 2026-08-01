@@ -713,7 +713,11 @@ if not hasattr(st, "_background_sync_thread_started"):
                 
                 if enabled and url and url.strip():
                     from app.services.import_service import ImportService
-                    ImportService.sync_from_web_url(url, imported_by="24/7 Daemon Sync")
+                    url_clean = url.strip()
+                    if any(kw in url_clean for kw in ['trycloudflare', 'ngrok', '9000']):
+                        ImportService.sync_from_tally_port(url_clean, imported_by="24/7 Tally Cloud Sync")
+                    else:
+                        ImportService.sync_from_web_url(url_clean, imported_by="24/7 Daemon Sync")
                 
                 time.sleep(max(60, interval * 60))
             except Exception:
