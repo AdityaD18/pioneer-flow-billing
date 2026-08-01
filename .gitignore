@@ -10,7 +10,6 @@ __pycache__/
 *.pyd
 
 # Local Relational Database File
-db/
 
 # Dynamic Uploads and Exports directories
 uploads/
