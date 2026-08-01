@@ -767,7 +767,7 @@ with t_catalog:
                LEFT JOIN INVENTORY i ON p.id = i.product_id
                LEFT JOIN PRODUCT_COSTS c ON p.id = c.product_id AND c.is_current = 1
                WHERE p.part_number LIKE ? OR p.part_name LIKE ? OR p.make LIKE ? OR p.series LIKE ?
-               ORDER BY p.part_number ASC LIMIT 100""",
+               ORDER BY p.part_number ASC LIMIT 10000""",
             (search_str, search_str, search_str, search_str)
         )
     else:
@@ -776,7 +776,7 @@ with t_catalog:
                FROM PRODUCTS p
                LEFT JOIN INVENTORY i ON p.id = i.product_id
                LEFT JOIN PRODUCT_COSTS c ON p.id = c.product_id AND c.is_current = 1
-               ORDER BY p.part_number ASC LIMIT 50"""
+               ORDER BY p.part_number ASC LIMIT 10000"""
         )
         
     if len(products_list) == 0:
@@ -862,7 +862,7 @@ with t_inventory:
     elif filter_status == "Below Reorder Level (Shortfall)":
         sql += " AND i.short_fall > 0"
         
-    sql += " ORDER BY i.short_fall DESC, i.current_stock DESC, p.part_number ASC LIMIT 250"
+    sql += " ORDER BY i.short_fall DESC, i.current_stock DESC, p.part_number ASC LIMIT 10000"
     
     stocked_items = query_db(sql, tuple(params))
     
