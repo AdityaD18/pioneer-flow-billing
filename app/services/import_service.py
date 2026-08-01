@@ -578,20 +578,21 @@ class ImportService:
                 "errors": [f"Invalid Tally XML structure: {str(ex)}"]
             }
             
+        tally_stock_items = root.findall('.//STOCKITEM')
         acc_names = root.findall('.//DSPACCNAME')
         stk_infos = root.findall('.//DSPSTKINFO')
-        
         tally_ledgers = root.findall('.//LEDGER')
-        if not acc_names and not tally_ledgers:
+        
+        if not tally_stock_items and not acc_names and not tally_ledgers:
             return {
                 "status": "failed",
                 "total_records": 0,
                 "successful_records": 0,
                 "failed_records": 0,
-                "errors": ["No Stock Summary or Ledger blocks found in Tally XML response."]
+                "errors": ["No StockItem, Stock Summary or Ledger blocks found in Tally XML response."]
             }
             
-        total_records = min(len(acc_names), len(stk_infos)) if (acc_names and stk_infos) else 0
+        total_records = len(tally_stock_items) if tally_stock_items else (min(len(acc_names), len(stk_infos)) if (acc_names and stk_infos) else 0)
         successful_records = 0
         failed_records = 0
         errors = []
@@ -600,24 +601,90 @@ class ImportService:
         conn.isolation_level = None
         cur = conn.cursor()
         cur.execute("BEGIN TRANSACTION;")
+
+        # Process STOCKITEM elements (Complete Collection Format)
+        if tally_stock_items:
+            for idx_s, s_item in enumerate(tally_stock_items):
+                item_code = s_item.attrib.get('NAME') or s_item.findtext('NAME')
+                if not item_code:
+                    nl = s_item.find('.//LANGUAGENAME.LIST/NAME.LIST/NAME')
+                    if nl is not None: item_code = nl.text
+                if not item_code: continue
+                item_code = item_code.strip()
+                if not item_code or item_code.lower() in ('nan', 'total'): continue
+                
+                parent_grp = (s_item.findtext('PARENT') or 'WAGO').strip()
+                qty_str = s_item.findtext('CLOSINGBALANCE') or '0'
+                rate_str = s_item.findtext('CLOSINGRATE') or '0'
+                
+                m_q = re.search(r'[-+]?\d*\.?\d+', qty_str.replace(',', ''))
+                stock_val = float(m_q.group(0)) if m_q else 0.0
+                
+                m_r = re.search(r'[-+]?\d*\.?\d+', rate_str.replace(',', ''))
+                rate_val = float(m_r.group(0)) if m_r else 0.0
+                
+                savepoint_name = f"sp_stk_{idx_s}"
+                try:
+                    cur.execute(f"SAVEPOINT {savepoint_name};")
+                    cur.execute("SELECT id FROM PRODUCTS WHERE part_number = ?", (item_code,))
+                    existing_prod = cur.fetchone()
+                    if not existing_prod:
+                        series = item_code.split('-')[0] if '-' in item_code else None
+                        cur.execute(
+                            "INSERT INTO PRODUCTS (part_number, part_name, series, make) VALUES (?, ?, ?, ?)",
+                            (item_code, item_code, series, parent_grp)
+                        )
+                        product_id = cur.lastrowid
+                    else:
+                        product_id = existing_prod['id']
+                        cur.execute("UPDATE PRODUCTS SET make = ? WHERE id = ?", (parent_grp, product_id))
+                        
+                    cur.execute("SELECT id FROM INVENTORY WHERE product_id = ?", (product_id,))
+                    inv = cur.fetchone()
+                    if inv is None:
+                        cur.execute(
+                            "INSERT INTO INVENTORY (product_id, current_stock, last_updated) VALUES (?, ?, ?)",
+                            (product_id, stock_val, datetime.now().isoformat())
+                        )
+                    else:
+                        cur.execute(
+                            "UPDATE INVENTORY SET current_stock = ?, last_updated = ? WHERE product_id = ?",
+                            (stock_val, datetime.now().isoformat(), product_id)
+                        )
+                        
+                    if rate_val > 0:
+                        cur.execute("UPDATE PRODUCT_COSTS SET is_current = 0 WHERE product_id = ? AND is_current = 1", (product_id,))
+                        cur.execute(
+                            "INSERT INTO PRODUCT_COSTS (product_id, price_per_100_pcs, price_per_unit, effective_from, is_current) VALUES (?, ?, ?, ?, 1)",
+                            (product_id, rate_val, rate_val / 100.0, datetime.now().isoformat())
+                        )
+                    cur.execute(f"RELEASE SAVEPOINT {savepoint_name};")
+                    successful_records += 1
+                except Exception as row_error:
+                    try: cur.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name};")
+                    except: pass
+                    failed_records += 1
+                    errors.append(f"Item {item_code}: {str(row_error)}")
         
-        for idx in range(total_records):
-            a_el = acc_names[idx]
-            s_el = stk_infos[idx]
-            
-            name_el = a_el.find('.//DSPDISPNAME')
-            qty_el = s_el.find('.//DSPCLQTY')
-            rate_el = s_el.find('.//DSPCLRATE')
-            
-            if name_el is None or not name_el.text:
-                continue
+        # Process DSPACCNAME elements (Report Format Fallback)
+        elif acc_names and stk_infos:
+            for idx in range(total_records):
+                a_el = acc_names[idx]
+                s_el = stk_infos[idx]
                 
-            item_code = name_el.text.strip()
-            if not item_code or item_code.lower() == 'nan' or item_code.lower() == 'total':
-                continue
+                name_el = a_el.find('.//DSPDISPNAME')
+                qty_el = s_el.find('.//DSPCLQTY')
+                rate_el = s_el.find('.//DSPCLRATE')
                 
-            qty_str = qty_el.text.strip() if qty_el is not None and qty_el.text else '0'
-            rate_str = rate_el.text.strip() if rate_el is not None and rate_el.text else '0'
+                if name_el is None or not name_el.text:
+                    continue
+                    
+                item_code = name_el.text.strip()
+                if not item_code or item_code.lower() == 'nan' or item_code.lower() == 'total':
+                    continue
+                    
+                qty_str = qty_el.text.strip() if qty_el is not None and qty_el.text else '0'
+                rate_str = rate_el.text.strip() if rate_el is not None and rate_el.text else '0'
             
             # parse numeric stock
             m_qty = re.search(r'[-+]?\d*\.?\d+', qty_str.replace(',', ''))
@@ -773,23 +840,39 @@ class ImportService:
 
     @classmethod
     def sync_from_tally_port(cls, tally_url='http://localhost:9000', imported_by='Tally Live Sync'):
-        """Connects directly to Tally Prime XML HTTP Server and imports live Stock Summary & Customers."""
+        """Connects directly to Tally Prime XML HTTP Server and imports 100% of Stock Items & Customers."""
         import urllib.request
+        import base64
+        import re
+        import xml.etree.ElementTree as ET
         
+        # TDL query for 100% of all StockItems across all groups
         tdl_stock_query = b"""<ENVELOPE>
   <HEADER>
-    <TALLYREQUEST>Export Data</TALLYREQUEST>
+    <VERSION>1</VERSION>
+    <TALLYREQUEST>Export</TALLYREQUEST>
+    <TYPE>Collection</TYPE>
+    <ID>AllStockItemsColl</ID>
   </HEADER>
   <BODY>
-    <EXPORTDATA>
-      <REQUESTDESC>
-        <REPORTNAME>Stock Summary</REPORTNAME>
-        <STATICVARIABLES>
-          <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
-          <ISITEMWISE>Yes</ISITEMWISE>
-        </STATICVARIABLES>
-      </REQUESTDESC>
-    </EXPORTDATA>
+    <DESC>
+      <STATICVARIABLES>
+        <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
+      </STATICVARIABLES>
+      <TDL>
+        <TDLMESSAGE>
+          <COLLECTION NAME="AllStockItemsColl" ISINITIALIZE="Yes">
+            <TYPE>StockItem</TYPE>
+            <NATIVEMETHOD>Name</NATIVEMETHOD>
+            <NATIVEMETHOD>Parent</NATIVEMETHOD>
+            <NATIVEMETHOD>Category</NATIVEMETHOD>
+            <NATIVEMETHOD>ClosingBalance</NATIVEMETHOD>
+            <NATIVEMETHOD>ClosingRate</NATIVEMETHOD>
+            <NATIVEMETHOD>ClosingValue</NATIVEMETHOD>
+          </COLLECTION>
+        </TDLMESSAGE>
+      </TDL>
+    </DESC>
   </BODY>
 </ENVELOPE>"""
 
@@ -820,20 +903,37 @@ class ImportService:
     </DESC>
   </BODY>
 </ENVELOPE>"""
+        headers = {'Content-Type': 'text/xml'}
+        # Pass Basic Auth if specified/needed
+        auth_b64 = base64.b64encode(b"1:PtAc@6801").decode('utf-8')
+        headers_auth = {'Content-Type': 'text/xml', 'Authorization': f'Basic {auth_b64}'}
+
+        def post_tally(query_bytes):
+            try:
+                req = urllib.request.Request(tally_url.strip(), data=query_bytes, headers=headers_auth)
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    return resp.read()
+            except Exception:
+                req = urllib.request.Request(tally_url.strip(), data=query_bytes, headers=headers)
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    return resp.read()
+
         try:
-            # 1. Fetch Stock Summary
-            req_stock = urllib.request.Request(tally_url.strip(), data=tdl_stock_query, headers={'Content-Type': 'text/xml'})
-            with urllib.request.urlopen(req_stock, timeout=15) as resp:
-                xml_stock_data = resp.read()
-                
-            res_stock = cls.import_from_tally_xml(xml_stock_data, filename='tally_stock_9000.xml', imported_by=imported_by)
+            # 1. Fetch 100% Stock Items
+            xml_stock_bytes = post_tally(tdl_stock_query)
+            res_stock = cls.import_from_tally_xml(xml_stock_bytes, filename='tally_stock_9000.xml', imported_by=imported_by)
             
+            # If StockItem collection parsing yielded records, return status
+            if res_stock.get('successful_records', 0) == 0:
+                # Fallback to Stock Summary report
+                tdl_fallback = b"""<ENVELOPE><HEADER><TALLYREQUEST>Export Data</TALLYREQUEST></HEADER><BODY><EXPORTDATA><REQUESTDESC><REPORTNAME>Stock Summary</REPORTNAME><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><ISITEMWISE>Yes</ISITEMWISE></STATICVARIABLES></REQUESTDESC></EXPORTDATA></BODY></ENVELOPE>"""
+                xml_fb = post_tally(tdl_fallback)
+                res_stock = cls.import_from_tally_xml(xml_fb, filename='tally_stock_fallback.xml', imported_by=imported_by)
+
             # 2. Fetch Customer Ledgers
             try:
-                req_ledger = urllib.request.Request(tally_url.strip(), data=tdl_ledger_query, headers={'Content-Type': 'text/xml'})
-                with urllib.request.urlopen(req_ledger, timeout=15) as resp:
-                    xml_ledger_data = resp.read()
-                cls.import_from_tally_xml(xml_ledger_data, filename='tally_ledgers_9000.xml', imported_by=imported_by)
+                xml_ledger_bytes = post_tally(tdl_ledger_query)
+                cls.import_from_tally_xml(xml_ledger_bytes, filename='tally_ledgers_9000.xml', imported_by=imported_by)
             except Exception:
                 pass
                 
