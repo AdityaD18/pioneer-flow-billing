@@ -1,0 +1,15 @@
+{
+  "host": "localhost",
+  "port": 9000,
+  "username": "1",
+  "password": "PtAc@6801",
+  "timeout_seconds": 45,
+  "max_retries": 3,
+  "polling_interval_seconds": 30,
+  "cache_db_path": "db/cache.db",
+  "prod_db_path": "db/database.db",
+  "log_file_path": "logs/tally_sync.log",
+  "min_expected_stock_items": 1000,
+  "min_expected_ledgers": 1000,
+  "enable_deletion_detection": true
+}

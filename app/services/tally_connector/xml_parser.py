@@ -10,10 +10,23 @@ class TallyXMLParser:
         if isinstance(xml_content, bytes):
             xml_content = xml_content.decode('utf-8', errors='ignore')
             
-        # Fix unescaped ampersands in company names / addresses
         clean_xml = re.sub(r'&(?!amp;|lt;|gt;|apos;|quot;)', '&amp;', xml_content)
         clean_xml = re.sub(r'&[a-zA-Z0-9#]+;', ' ', clean_xml)
         return clean_xml
+
+    @classmethod
+    def parse_object_count(cls, xml_raw, object_tag="STOCKITEM"):
+        """Extracts the exact total count of an object type directly from XML."""
+        clean_xml = cls.sanitize_xml(xml_raw)
+        try:
+            root = ET.fromstring(clean_xml)
+            elems = root.findall(f'.//{object_tag.upper()}')
+            return len(elems)
+        except Exception:
+            matches = re.findall(rf'<{object_tag.upper()}[^>]*NAME="([^"]+)"', clean_xml, re.IGNORECASE)
+            if not matches:
+                matches = re.findall(rf'<{object_tag.upper()}[^>]*>(.*?)</{object_tag.upper()}>', clean_xml, re.DOTALL)
+            return len(matches)
 
     @classmethod
     def parse_stock_items(cls, xml_raw):
@@ -80,7 +93,6 @@ class TallyXMLParser:
                     return c_name.strip()
         except Exception:
             pass
-        # Regex search fallback
         match = re.search(r'<COMPANY[^>]*NAME="([^"]+)"', clean_xml, re.IGNORECASE)
         return match.group(1) if match else "Primary Company"
 
@@ -94,9 +106,12 @@ class TallyXMLParser:
             return None
             
         name = name.strip()
+        alias = (s_elem.findtext('ALIAS') or '').strip()
         parent = (s_elem.findtext('PARENT') or 'WAGO').strip()
         category = (s_elem.findtext('CATEGORY') or '').strip()
+        description = (s_elem.findtext('DESCRIPTION') or '').strip()
         base_units = (s_elem.findtext('BASEUNITS') or 'PCS').strip()
+        hsn_code = (s_elem.findtext('HSNCODE') or '').strip()
         
         q_str = s_elem.findtext('CLOSINGBALANCE') or '0'
         r_str = s_elem.findtext('CLOSINGRATE') or '0'
@@ -107,13 +122,16 @@ class TallyXMLParser:
         m_v = re.search(r'[-+]?\d*\.?\d+', v_str.replace(',', ''))
         
         return {
-            "guid": s_elem.findtext('GUID') or "",
+            "guid": s_elem.findtext('GUID') or f"GUID_STOCK_{hash(name)}",
             "master_id": int(s_elem.findtext('MASTERID') or 0),
             "alter_id": int(s_elem.findtext('ALTERID') or 0),
             "name": name,
+            "alias": alias,
             "parent": parent,
             "category": category,
+            "description": description,
             "base_units": base_units,
+            "hsn_code": hsn_code,
             "closing_stock": float(m_q.group(0)) if m_q else 0.0,
             "closing_rate": float(m_r.group(0)) if m_r else 0.0,
             "closing_value": float(m_v.group(0)) if m_v else 0.0
@@ -129,24 +147,32 @@ class TallyXMLParser:
             return None
             
         name = name.strip()
+        alias = (l_elem.findtext('ALIAS') or '').strip()
         parent = (l_elem.findtext('PARENT') or '').strip()
         gstin = (l_elem.findtext('PARTYGSTIN') or l_elem.findtext('GSTIN') or '').strip()
         phone = (l_elem.findtext('LEDGERPHONE') or l_elem.findtext('MOBILE') or '').strip()
         email = (l_elem.findtext('EMAIL') or '').strip()
+        pincode = (l_elem.findtext('PINCODE') or '').strip()
+        state = (l_elem.findtext('STATENAME') or '').strip()
+        country = (l_elem.findtext('COUNTRYNAME') or '').strip()
         
         addr_list = [a.text for a in l_elem.findall('.//ADDRESS') if a is not None and a.text]
         address = " | ".join(addr_list) if addr_list else ""
         
         return {
-            "guid": l_elem.findtext('GUID') or "",
+            "guid": l_elem.findtext('GUID') or f"GUID_LEDGER_{hash(name)}",
             "master_id": int(l_elem.findtext('MASTERID') or 0),
             "alter_id": int(l_elem.findtext('ALTERID') or 0),
             "name": name,
+            "alias": alias,
             "parent": parent,
             "gstin": gstin,
             "phone": phone,
             "email": email,
-            "address": address
+            "address": address,
+            "pincode": pincode,
+            "state": state,
+            "country": country
         }
 
     @staticmethod
@@ -165,13 +191,16 @@ class TallyXMLParser:
             v_val = float(re.search(r'[-+]?\d*\.?\d+', v_m.group(1).replace(',', '')).group(0)) if v_m else 0.0
             
             items.append({
-                "guid": "",
+                "guid": f"GUID_STOCK_{hash(s_name.strip())}",
                 "master_id": 0,
                 "alter_id": 0,
                 "name": s_name.strip(),
+                "alias": "",
                 "parent": p_m.group(1).strip() if p_m else "WAGO",
                 "category": c_m.group(1).strip() if c_m else "",
+                "description": "",
                 "base_units": "PCS",
+                "hsn_code": "",
                 "closing_stock": q_val,
                 "closing_rate": r_val,
                 "closing_value": v_val
@@ -189,14 +218,18 @@ class TallyXMLParser:
             em_m = re.search(r'<EMAIL>([^<]+)</EMAIL>', l_content)
             
             ledgers.append({
-                "guid": "",
+                "guid": f"GUID_LEDGER_{hash(l_name.strip())}",
                 "master_id": 0,
                 "alter_id": 0,
                 "name": l_name.strip(),
+                "alias": "",
                 "parent": p_m.group(1).strip() if p_m else "",
                 "gstin": g_m.group(1).strip() if g_m else "",
                 "phone": ph_m.group(1).strip() if ph_m else "",
                 "email": em_m.group(1).strip() if em_m else "",
-                "address": ""
+                "address": "",
+                "pincode": "",
+                "state": "",
+                "country": ""
             })
         return ledgers

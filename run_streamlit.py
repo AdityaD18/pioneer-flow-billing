@@ -2042,10 +2042,12 @@ with t_settings:
 
 # --- TAB: TALLY SYNC DASHBOARD ---
 with t_tally:
-    render_html('<div class="section-head"><i class="fa-solid fa-bolt"></i> Pioneer Connector - Tally Prime 7.1 Sync Engine</div>')
-    st.caption("Live Status, Cache Metrics, Health Diagnostics, and Manual Sync Controls for Tally Prime Integration")
+    render_html('<div class="section-head"><i class="fa-solid fa-bolt"></i> Pioneer Connector - Production Tally Prime 7.1 Integration</div>')
+    st.caption("Production Readiness Control Panel: Real-time Health, Dynamic Count Validation, Sync Manifests & Diagnostics")
     
     from app.services.tally_connector import PioneerConnector
+    from app.services.tally_connector.config import tally_config
+    
     connector = PioneerConnector()
     is_connected = connector.check_connection()
     active_company = connector.get_active_company() if is_connected else "Disconnected / Off-line"
@@ -2053,15 +2055,15 @@ with t_tally:
     # 1. Connection Health Cards
     col_t1, col_t2, col_t3, col_t4 = st.columns(4)
     with col_t1:
-        draw_metric_card("Connection Status", "Connected" if is_connected else "Disconnected", "Port 9000 XML Engine", "fa-solid fa-plug", "green" if is_connected else "red")
+        draw_metric_card("Connection Health", "Connected" if is_connected else "Disconnected", f"Endpoint: {tally_config.get('host')}:{tally_config.get('port')}", "fa-solid fa-plug", "green" if is_connected else "red")
     with col_t2:
         draw_metric_card("Active Company", active_company, "Target Tally Vault", "fa-solid fa-building", "purple")
     with col_t3:
         stk_cnt = query_db("SELECT COUNT(*) as c FROM PRODUCTS", one=True)['c']
-        draw_metric_card("Cached Stock SKUs", f"{stk_cnt:,}", "StockItem objects in ERP", "fa-solid fa-boxes-stacked", "cyan")
+        draw_metric_card("Cached Stock SKUs", f"{stk_cnt:,}", "Verified StockItem Objects", "fa-solid fa-boxes-stacked", "cyan")
     with col_t4:
         leg_cnt = query_db("SELECT COUNT(*) as c FROM CUSTOMERS", one=True)['c']
-        draw_metric_card("Cached Ledgers", f"{leg_cnt:,}", "Customer profiles in ERP", "fa-solid fa-address-book", "amber")
+        draw_metric_card("Cached Ledgers", f"{leg_cnt:,}", "Verified Party Ledgers", "fa-solid fa-address-book", "amber")
         
     st.markdown("<br>", unsafe_allow_html=True)
     
@@ -2069,41 +2071,59 @@ with t_tally:
     c_btn1, c_btn2, c_btn3 = st.columns(3)
     with c_btn1:
         if st.button("🚀 Run Full Sync Now", use_container_width=True, type="primary", key="btn_tally_full_sync"):
-            with st.spinner("Executing Full Tally Prime Sync (4,254 Items & 3,073 Ledgers)..."):
-                res = connector.full_sync()
-                if res.get('status') == 'success':
-                    trigger_toast(f"Full Sync Succeeded! Synced {res['stock_count']:,} Items & {res['ledger_count']:,} Ledgers in {res['duration_sec']}s", icon="⚡")
+            with st.spinner("Executing Full Tally Prime Atomic Sync with Dynamic Validation..."):
+                m = connector.full_sync()
+                if m.get('validation_result') == 'PASSED':
+                    trigger_toast(f"Full Sync Manifest [{m['sync_id']}] Passed! Ins: {m['inserted_records']:,}, Upd: {m['updated_records']:,} in {m['duration_sec']}s", icon="⚡")
                     st.rerun()
                 else:
-                    st.error(f"Full Sync Failed: {res.get('error')}")
+                    st.error(f"Full Sync Failed: {m.get('validation_result')}")
                     
     with c_btn2:
         if st.button("🔄 Run Incremental Sync", use_container_width=True, key="btn_tally_inc_sync"):
-            with st.spinner("Checking modified Tally records via AlterID..."):
-                res = connector.incremental_sync()
-                if res.get('status') == 'success':
-                    trigger_toast(f"Incremental Sync Succeeded! Updated {res['stock_count']:,} items in {res['duration_sec']}s", icon="🔄")
+            with st.spinner("Checking modified records via per-object AlterID..."):
+                m = connector.incremental_sync()
+                if m.get('validation_result') == 'PASSED':
+                    trigger_toast(f"Incremental Sync Manifest [{m['sync_id']}] Passed! Ins: {m['inserted_records']:,}, Upd: {m['updated_records']:,}", icon="🔄")
                     st.rerun()
                 else:
-                    st.error(f"Incremental Sync Failed: {res.get('error')}")
+                    st.error(f"Incremental Sync Failed: {m.get('validation_result')}")
                     
     with c_btn3:
         if st.button("🔌 Test Connection Health", use_container_width=True, key="btn_tally_test_conn"):
             if connector.check_connection():
-                st.success(f"Connected to Tally Prime! Active Company: **{connector.get_active_company()}**")
+                st.success(f"Connected to Tally Prime 7.1! Active Vault Company: **{connector.get_active_company()}**")
             else:
-                st.error("Tally Prime Port 9000 is not reachable on localhost.")
+                st.error(f"Tally Prime is not reachable on {tally_config.get('host')}:{tally_config.get('port')}.")
                 
     st.markdown("<br>", unsafe_allow_html=True)
-    render_html('<div class="setting-section"><div class="setting-section-title"><i class="fa-solid fa-list-check"></i> Synchronization Log History</div></div>')
     
-    metrics = connector.cache.get_latest_sync_metrics()
-    if not metrics:
-        st.info("No synchronization metrics recorded yet.")
+    # 3. Synchronization Manifest Inspector
+    render_html('<div class="setting-section"><div class="setting-section-title"><i class="fa-solid fa-list-check"></i> Synchronization Manifest Inspector</div></div>')
+    st.caption("Detailed transaction manifests recorded for every synchronization run (Audit Trail & Verification Log)")
+    
+    manifests = connector.cache.get_latest_sync_manifests(limit=15)
+    if not manifests:
+        st.info("No sync manifests generated yet. Click 'Run Full Sync Now' above to generate an initial manifest.")
     else:
+        df_manifests = []
+        for m in manifests:
+            df_manifests.append({
+                "Sync ID": m["sync_id"],
+                "Type": m["sync_type"],
+                "Timestamp": m["timestamp"],
+                "Expected": m["expected_records"],
+                "Received": m["received_records"],
+                "Inserted": m["inserted_records"],
+                "Updated": m["updated_records"],
+                "Deleted": m["deleted_records"],
+                "Duration (s)": m["duration_sec"],
+                "Validation Result": m["validation_result"]
+            })
         st.dataframe(
-            pd.DataFrame(metrics),
+            pd.DataFrame(df_manifests),
             use_container_width=True,
             hide_index=True
         )
+
 

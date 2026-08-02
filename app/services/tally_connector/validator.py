@@ -5,14 +5,20 @@ class TallyValidationError(Exception):
     pass
 
 class TallyValidator:
-    """Validates imported Tally data to ensure zero silent data loss."""
+    """Validates imported Tally data dynamically against live Tally object counts."""
 
     @staticmethod
-    def validate_stock_items(stock_items, min_expected=1000):
+    def validate_stock_items(stock_items, expected_count=0, min_expected=100):
         actual_count = len(stock_items)
-        tally_logger.info(f"🔍 Validating Stock Items: Imported {actual_count:,} items.")
+        tally_logger.info(f"🔍 Validating Stock Items: Imported {actual_count:,} items (Dynamic Expected: {expected_count:,}).")
         
-        if actual_count < min_expected:
+        # Check against dynamic expected count if available
+        if expected_count > 0 and actual_count < expected_count:
+            msg = f"Validation Failed: Dynamic Expected Stock Count = {expected_count:,}, but imported {actual_count:,}!"
+            tally_logger.error(f"❌ {msg}")
+            raise TallyValidationError(msg)
+            
+        if expected_count == 0 and actual_count < min_expected:
             msg = f"Validation Failed: Expected at least {min_expected:,} Stock Items, but imported only {actual_count:,}!"
             tally_logger.error(f"❌ {msg}")
             raise TallyValidationError(msg)
@@ -21,11 +27,16 @@ class TallyValidator:
         return True
 
     @staticmethod
-    def validate_ledgers(ledgers, min_expected=1000):
+    def validate_ledgers(ledgers, expected_count=0, min_expected=100):
         actual_count = len(ledgers)
-        tally_logger.info(f"🔍 Validating Ledgers: Imported {actual_count:,} ledgers.")
+        tally_logger.info(f"🔍 Validating Ledgers: Imported {actual_count:,} ledgers (Dynamic Expected: {expected_count:,}).")
         
-        if actual_count < min_expected:
+        if expected_count > 0 and actual_count < expected_count:
+            msg = f"Validation Failed: Dynamic Expected Ledger Count = {expected_count:,}, but imported {actual_count:,}!"
+            tally_logger.error(f"❌ {msg}")
+            raise TallyValidationError(msg)
+            
+        if expected_count == 0 and actual_count < min_expected:
             msg = f"Validation Failed: Expected at least {min_expected:,} Ledgers, but imported only {actual_count:,}!"
             tally_logger.error(f"❌ {msg}")
             raise TallyValidationError(msg)
