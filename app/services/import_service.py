@@ -840,104 +840,27 @@ class ImportService:
 
     @classmethod
     def sync_from_tally_port(cls, tally_url='http://localhost:9000', imported_by='Tally Live Sync'):
-        """Connects directly to Tally Prime XML HTTP Server and imports 100% of Stock Items & Customers."""
-        import urllib.request
-        import base64
-        import re
-        import xml.etree.ElementTree as ET
-        
-        # TDL query for 100% of all StockItems across all groups
-        tdl_stock_query = b"""<ENVELOPE>
-  <HEADER>
-    <VERSION>1</VERSION>
-    <TALLYREQUEST>Export</TALLYREQUEST>
-    <TYPE>Collection</TYPE>
-    <ID>AllStockItemsColl</ID>
-  </HEADER>
-  <BODY>
-    <DESC>
-      <STATICVARIABLES>
-        <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
-      </STATICVARIABLES>
-      <TDL>
-        <TDLMESSAGE>
-          <COLLECTION NAME="AllStockItemsColl" ISINITIALIZE="Yes">
-            <TYPE>StockItem</TYPE>
-            <NATIVEMETHOD>Name</NATIVEMETHOD>
-            <NATIVEMETHOD>Parent</NATIVEMETHOD>
-            <NATIVEMETHOD>Category</NATIVEMETHOD>
-            <NATIVEMETHOD>ClosingBalance</NATIVEMETHOD>
-            <NATIVEMETHOD>ClosingRate</NATIVEMETHOD>
-            <NATIVEMETHOD>ClosingValue</NATIVEMETHOD>
-          </COLLECTION>
-        </TDLMESSAGE>
-      </TDL>
-    </DESC>
-  </BODY>
-</ENVELOPE>"""
-
-        tdl_ledger_query = b"""<ENVELOPE>
-  <HEADER>
-    <VERSION>1</VERSION>
-    <TALLYREQUEST>Export</TALLYREQUEST>
-    <TYPE>Collection</TYPE>
-    <ID>LedgerColl</ID>
-  </HEADER>
-  <BODY>
-    <DESC>
-      <STATICVARIABLES>
-        <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
-      </STATICVARIABLES>
-      <TDL>
-        <TDLMESSAGE>
-          <COLLECTION NAME="LedgerColl" ISINITIALIZE="Yes">
-            <TYPE>Ledger</TYPE>
-            <NATIVEMETHOD>Name</NATIVEMETHOD>
-            <NATIVEMETHOD>Parent</NATIVEMETHOD>
-            <NATIVEMETHOD>PartyGSTIN</NATIVEMETHOD>
-            <NATIVEMETHOD>LedgerPhone</NATIVEMETHOD>
-            <NATIVEMETHOD>Email</NATIVEMETHOD>
-          </COLLECTION>
-        </TDLMESSAGE>
-      </TDL>
-    </DESC>
-  </BODY>
-</ENVELOPE>"""
-        headers = {'Content-Type': 'text/xml'}
-        # Pass Basic Auth if specified/needed
-        auth_b64 = base64.b64encode(b"1:PtAc@6801").decode('utf-8')
-        headers_auth = {'Content-Type': 'text/xml', 'Authorization': f'Basic {auth_b64}'}
-
-        def post_tally(query_bytes):
-            try:
-                req = urllib.request.Request(tally_url.strip(), data=query_bytes, headers=headers_auth)
-                with urllib.request.urlopen(req, timeout=30) as resp:
-                    return resp.read()
-            except Exception:
-                req = urllib.request.Request(tally_url.strip(), data=query_bytes, headers=headers)
-                with urllib.request.urlopen(req, timeout=30) as resp:
-                    return resp.read()
-
+        """Connects directly to Tally Prime XML HTTP Server via PioneerConnector."""
         try:
-            # 1. Fetch 100% Stock Items
-            xml_stock_bytes = post_tally(tdl_stock_query)
-            res_stock = cls.import_from_tally_xml(xml_stock_bytes, filename='tally_stock_9000.xml', imported_by=imported_by)
-            
-            # If StockItem collection parsing yielded records, return status
-            if res_stock.get('successful_records', 0) == 0:
-                # Fallback to Stock Summary report
-                tdl_fallback = b"""<ENVELOPE><HEADER><TALLYREQUEST>Export Data</TALLYREQUEST></HEADER><BODY><EXPORTDATA><REQUESTDESC><REPORTNAME>Stock Summary</REPORTNAME><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><ISITEMWISE>Yes</ISITEMWISE></STATICVARIABLES></REQUESTDESC></EXPORTDATA></BODY></ENVELOPE>"""
-                xml_fb = post_tally(tdl_fallback)
-                res_stock = cls.import_from_tally_xml(xml_fb, filename='tally_stock_fallback.xml', imported_by=imported_by)
-
-            # 2. Fetch Customer Ledgers
-            try:
-                xml_ledger_bytes = post_tally(tdl_ledger_query)
-                cls.import_from_tally_xml(xml_ledger_bytes, filename='tally_ledgers_9000.xml', imported_by=imported_by)
-            except Exception:
-                pass
-                
-            return res_stock
+            from app.services.tally_connector import PioneerConnector
+            connector = PioneerConnector()
+            res = connector.full_sync()
+            if res.get('status') == 'success':
+                return {
+                    "status": "success",
+                    "total_records": res.get('stock_count', 0),
+                    "successful_records": res.get('stock_count', 0),
+                    "failed_records": 0,
+                    "errors": []
+                }
+            else:
+                return {
+                    "status": "failed",
+                    "total_records": 0,
+                    "successful_records": 0,
+                    "failed_records": 0,
+                    "errors": [res.get('error', 'Unknown sync failure')]
+                }
         except Exception as ex:
             return {
                 "status": "failed",

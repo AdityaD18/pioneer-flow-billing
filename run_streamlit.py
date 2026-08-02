@@ -646,7 +646,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 5. Core Navigation Tabs
-t_dash, t_catalog, t_inventory, t_customers, t_invoice, t_quotation, t_history, t_manual, t_settings = st.tabs([
+t_dash, t_catalog, t_inventory, t_customers, t_invoice, t_quotation, t_history, t_manual, t_settings, t_tally = st.tabs([
     "📊 Dashboard",
     "📦 Catalog",
     "🔍 Inventory",
@@ -655,7 +655,8 @@ t_dash, t_catalog, t_inventory, t_customers, t_invoice, t_quotation, t_history, 
     "📄 New Quotation",
     "📜 History",
     "➕ Manual Entry",
-    "⚙️ Settings"
+    "⚙️ Settings",
+    "⚡ Tally Sync"
 ])
 
 # Toast persistence manager
@@ -2037,3 +2038,72 @@ with t_settings:
                 st.rerun()
             else:
                 st.error(f"Customer import failed: {', '.join(c_res['errors'])}")
+
+
+# --- TAB: TALLY SYNC DASHBOARD ---
+with t_tally:
+    render_html('<div class="section-head"><i class="fa-solid fa-bolt"></i> Pioneer Connector - Tally Prime 7.1 Sync Engine</div>')
+    st.caption("Live Status, Cache Metrics, Health Diagnostics, and Manual Sync Controls for Tally Prime Integration")
+    
+    from app.services.tally_connector import PioneerConnector
+    connector = PioneerConnector()
+    is_connected = connector.check_connection()
+    active_company = connector.get_active_company() if is_connected else "Disconnected / Off-line"
+    
+    # 1. Connection Health Cards
+    col_t1, col_t2, col_t3, col_t4 = st.columns(4)
+    with col_t1:
+        draw_metric_card("Connection Status", "Connected" if is_connected else "Disconnected", "Port 9000 XML Engine", "fa-solid fa-plug", "green" if is_connected else "red")
+    with col_t2:
+        draw_metric_card("Active Company", active_company, "Target Tally Vault", "fa-solid fa-building", "purple")
+    with col_t3:
+        stk_cnt = query_db("SELECT COUNT(*) as c FROM PRODUCTS", one=True)['c']
+        draw_metric_card("Cached Stock SKUs", f"{stk_cnt:,}", "StockItem objects in ERP", "fa-solid fa-boxes-stacked", "cyan")
+    with col_t4:
+        leg_cnt = query_db("SELECT COUNT(*) as c FROM CUSTOMERS", one=True)['c']
+        draw_metric_card("Cached Ledgers", f"{leg_cnt:,}", "Customer profiles in ERP", "fa-solid fa-address-book", "amber")
+        
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # 2. Action Controls
+    c_btn1, c_btn2, c_btn3 = st.columns(3)
+    with c_btn1:
+        if st.button("🚀 Run Full Sync Now", use_container_width=True, type="primary", key="btn_tally_full_sync"):
+            with st.spinner("Executing Full Tally Prime Sync (4,254 Items & 3,073 Ledgers)..."):
+                res = connector.full_sync()
+                if res.get('status') == 'success':
+                    trigger_toast(f"Full Sync Succeeded! Synced {res['stock_count']:,} Items & {res['ledger_count']:,} Ledgers in {res['duration_sec']}s", icon="⚡")
+                    st.rerun()
+                else:
+                    st.error(f"Full Sync Failed: {res.get('error')}")
+                    
+    with c_btn2:
+        if st.button("🔄 Run Incremental Sync", use_container_width=True, key="btn_tally_inc_sync"):
+            with st.spinner("Checking modified Tally records via AlterID..."):
+                res = connector.incremental_sync()
+                if res.get('status') == 'success':
+                    trigger_toast(f"Incremental Sync Succeeded! Updated {res['stock_count']:,} items in {res['duration_sec']}s", icon="🔄")
+                    st.rerun()
+                else:
+                    st.error(f"Incremental Sync Failed: {res.get('error')}")
+                    
+    with c_btn3:
+        if st.button("🔌 Test Connection Health", use_container_width=True, key="btn_tally_test_conn"):
+            if connector.check_connection():
+                st.success(f"Connected to Tally Prime! Active Company: **{connector.get_active_company()}**")
+            else:
+                st.error("Tally Prime Port 9000 is not reachable on localhost.")
+                
+    st.markdown("<br>", unsafe_allow_html=True)
+    render_html('<div class="setting-section"><div class="setting-section-title"><i class="fa-solid fa-list-check"></i> Synchronization Log History</div></div>')
+    
+    metrics = connector.cache.get_latest_sync_metrics()
+    if not metrics:
+        st.info("No synchronization metrics recorded yet.")
+    else:
+        st.dataframe(
+            pd.DataFrame(metrics),
+            use_container_width=True,
+            hide_index=True
+        )
+
