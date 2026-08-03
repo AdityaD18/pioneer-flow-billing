@@ -1,6 +1,7 @@
 from typing import Dict, Type
 from app.providers.base_provider import BaseDataProvider
 from app.providers.excel_provider import ExcelDataProvider
+from app.providers.tally_provider import TallyDataProvider
 from app.core.config import Config
 from app.core.logger import app_logger
 
@@ -8,7 +9,8 @@ class ProviderFactory:
     """Factory managing source-agnostic Data Provider instances driven by configuration."""
     
     _registry: Dict[str, Type[BaseDataProvider]] = {
-        "excel": ExcelDataProvider
+        "excel": ExcelDataProvider,
+        "tally": TallyDataProvider
     }
     _instances: Dict[str, BaseDataProvider] = {}
 

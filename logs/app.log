@@ -995,3 +995,295 @@ ValueError: Excel file format cannot be determined, you must specify an engine m
 2026-08-03 15:28:04 | INFO     | [pioneer_billing.billing] | Successfully generated quotation 'QTN-2026-01001' (ID: 1) for customer 'Quotation Client'.
 2026-08-03 15:28:04 | INFO     | [pioneer_billing.import] | Starting inventory import from file 'uploaded_file.xlsx', sheet 'Stock Group Reorder Status'.
 2026-08-03 15:28:04 | INFO     | [pioneer_billing.import] | Inventory import finished (success): 1408/1408 successful, 0 failed.
+2026-08-03 15:30:24 | INFO     | [pioneer_billing.database] | Initializing database at path: A:\Project1\instance\db\database.db
+2026-08-03 15:30:24 | INFO     | [pioneer_billing.database] | Database initialization completed successfully.
+2026-08-03 15:30:24 | INFO     | [pioneer_billing.app] | Instantiated singleton Data Provider 'excel' (ExcelDataProvider).
+2026-08-03 15:30:39 | INFO     | [pioneer_billing.database] | Initializing database at path: A:\Project1\instance\db\database.db
+2026-08-03 15:30:39 | INFO     | [pioneer_billing.database] | Database initialization completed successfully.
+2026-08-03 15:30:39 | INFO     | [pioneer_billing.app] | Instantiated singleton Data Provider 'excel' (ExcelDataProvider).
+2026-08-03 15:30:43 | WARNING  | [pioneer_billing.app] | Connector REST API unavailable at http://localhost:8000/api/v1/company: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/company (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it")). Falling back to local store.
+2026-08-03 15:30:47 | WARNING  | [pioneer_billing.app] | Connector REST API unavailable at http://localhost:8000/api/v1/stock: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/stock (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it")). Falling back to local store.
+2026-08-03 15:30:51 | WARNING  | [pioneer_billing.app] | Connector REST API unavailable at http://localhost:8000/api/v1/stock/groups: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/stock/groups (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it")). Falling back to local store.
+2026-08-03 15:30:51 | INFO     | [pioneer_billing.billing] | Created customer 'Provider Test Client' (ID: 15, Discount: 5.0%).
+2026-08-03 15:30:55 | WARNING  | [pioneer_billing.app] | Connector REST API unavailable at http://localhost:8000/api/v1/customers: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/customers (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it")). Falling back to local store.
+2026-08-03 15:30:59 | WARNING  | [pioneer_billing.app] | Connector REST API unavailable at http://localhost:8000/api/v1/stock: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/stock (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it")). Falling back to local store.
+2026-08-03 15:31:02 | INFO     | [pioneer_billing.database] | Initializing database at path: A:\Project1\instance\db\database.db
+2026-08-03 15:31:02 | INFO     | [pioneer_billing.database] | Database initialization completed successfully.
+2026-08-03 15:31:02 | INFO     | [pioneer_billing.app] | Instantiated singleton Data Provider 'excel' (ExcelDataProvider).
+2026-08-03 15:31:03 | WARNING  | [pioneer_billing.app] | Connector REST API unavailable at http://localhost:8000/api/v1/ledgers: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/ledgers (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it")). Falling back to local store.
+2026-08-03 15:31:06 | WARNING  | [pioneer_billing.app] | Connector REST API unavailable at http://localhost:8000/api/v1/company: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/company (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it")). Falling back to local store.
+2026-08-03 15:31:07 | WARNING  | [pioneer_billing.app] | Connector REST API unavailable at http://localhost:8000/api/v1/stock: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/stock (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it")). Falling back to local store.
+2026-08-03 15:31:07 | INFO     | [pioneer_billing.billing] | Created customer 'Provider Invoice Client' (ID: 16, Discount: 10.0%).
+2026-08-03 15:31:07 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 12
+2026-08-03 15:31:07 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01012' (ID: 12) for order_id 12.
+2026-08-03 15:31:07 | INFO     | [pioneer_billing.import] | Starting inventory import from file 'uploaded_file.xlsx', sheet 'Stock Group Reorder Status'.
+2026-08-03 15:31:07 | WARNING  | [pioneer_billing.import] | Header detection failed on sheet 'Stock Group Reorder Status': [Errno 2] No such file or directory: 'non_existent_file_path_999.xlsx'. Attempting matching sheet search...
+2026-08-03 15:31:07 | ERROR    | [pioneer_billing.import] | Header detection failed for stock sheet: [Errno 2] No such file or directory: 'non_existent_file_path_999.xlsx'
+Traceback (most recent call last):
+  File "A:\Project1\app\services\import_service.py", line 32, in import_inventory
+    df = cls.detect_headers_and_df(file_path, sheet_name, item_groups)
+  File "A:\Project1\app\services\import_service.py", line 24, in detect_headers_and_df
+    return ExcelHeaderDetector.detect_headers_and_df(file_path, sheet_name, mandatory_synonym_groups)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "A:\Project1\app\services\excel_header_detector.py", line 11, in detect_headers_and_df
+    df_raw = pd.read_excel(file_path, sheet_name=sheet_name, header=None, nrows=30)
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 481, in read_excel
+    io = ExcelFile(
+        io,
+    ...<2 lines>...
+        engine_kwargs=engine_kwargs,
+    )
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 1604, in __init__
+    ext = inspect_excel_format(
+        content_or_path=path_or_buffer, storage_options=storage_options
+    )
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 1452, in inspect_excel_format
+    with get_handle(
+         ~~~~~~~~~~^
+        content_or_path, "rb", storage_options=storage_options, is_text=False
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ) as handle:
+    ^
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\common.py", line 939, in get_handle
+    handle = open(handle, ioargs.mode)
+FileNotFoundError: [Errno 2] No such file or directory: 'non_existent_file_path_999.xlsx'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "A:\Project1\app\services\import_service.py", line 38, in import_inventory
+    xls = pd.ExcelFile(file_path)
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 1604, in __init__
+    ext = inspect_excel_format(
+        content_or_path=path_or_buffer, storage_options=storage_options
+    )
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 1452, in inspect_excel_format
+    with get_handle(
+         ~~~~~~~~~~^
+        content_or_path, "rb", storage_options=storage_options, is_text=False
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ) as handle:
+    ^
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\common.py", line 939, in get_handle
+    handle = open(handle, ioargs.mode)
+FileNotFoundError: [Errno 2] No such file or directory: 'non_existent_file_path_999.xlsx'
+2026-08-03 15:31:07 | INFO     | [pioneer_billing.import] | Starting inventory import from file 'corrupt.xlsx', sheet 'Stock Group Reorder Status'.
+2026-08-03 15:31:07 | WARNING  | [pioneer_billing.import] | Header detection failed on sheet 'Stock Group Reorder Status': Excel file format cannot be determined, you must specify an engine manually.. Attempting matching sheet search...
+2026-08-03 15:31:07 | ERROR    | [pioneer_billing.import] | Header detection failed for stock sheet: Excel file format cannot be determined, you must specify an engine manually.
+Traceback (most recent call last):
+  File "A:\Project1\app\services\import_service.py", line 32, in import_inventory
+    df = cls.detect_headers_and_df(file_path, sheet_name, item_groups)
+  File "A:\Project1\app\services\import_service.py", line 24, in detect_headers_and_df
+    return ExcelHeaderDetector.detect_headers_and_df(file_path, sheet_name, mandatory_synonym_groups)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "A:\Project1\app\services\excel_header_detector.py", line 11, in detect_headers_and_df
+    df_raw = pd.read_excel(file_path, sheet_name=sheet_name, header=None, nrows=30)
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 481, in read_excel
+    io = ExcelFile(
+        io,
+    ...<2 lines>...
+        engine_kwargs=engine_kwargs,
+    )
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 1608, in __init__
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: Excel file format cannot be determined, you must specify an engine manually.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "A:\Project1\app\services\import_service.py", line 38, in import_inventory
+    xls = pd.ExcelFile(file_path)
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 1608, in __init__
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: Excel file format cannot be determined, you must specify an engine manually.
+2026-08-03 15:31:10 | WARNING  | [pioneer_billing.app] | Connector REST API unavailable at http://localhost:8000/api/v1/stock: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/stock (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it")). Falling back to local store.
+2026-08-03 15:31:14 | WARNING  | [pioneer_billing.app] | Connector REST API unavailable at http://localhost:8000/api/v1/stock/groups: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/stock/groups (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it")). Falling back to local store.
+2026-08-03 15:31:14 | WARNING  | [pioneer_billing.billing] | Customer creation failed: Customer with name 'Provider Test Client' already exists.
+2026-08-03 15:31:18 | WARNING  | [pioneer_billing.app] | Connector REST API unavailable at http://localhost:8000/api/v1/stock: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/stock (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it")). Falling back to local store.
+2026-08-03 15:31:22 | WARNING  | [pioneer_billing.app] | Connector REST API unavailable at http://localhost:8000/api/v1/ledgers: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/ledgers (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it")). Falling back to local store.
+2026-08-03 15:31:24 | INFO     | [pioneer_billing.database] | Initializing database at path: A:\Project1\instance\db\database.db
+2026-08-03 15:31:24 | INFO     | [pioneer_billing.database] | Database initialization completed successfully.
+2026-08-03 15:31:24 | INFO     | [pioneer_billing.app] | Instantiated singleton Data Provider 'excel' (ExcelDataProvider).
+2026-08-03 15:31:26 | WARNING  | [pioneer_billing.app] | Connector REST API unavailable at http://localhost:8000/api/v1/stock: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/stock (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it")). Falling back to local store.
+2026-08-03 15:31:26 | WARNING  | [pioneer_billing.billing] | Customer creation failed: Customer with name 'Provider Invoice Client' already exists.
+2026-08-03 15:31:26 | INFO     | [pioneer_billing.import] | Starting inventory import from file 'uploaded_file.xlsx', sheet 'Stock Group Reorder Status'.
+2026-08-03 15:31:26 | WARNING  | [pioneer_billing.import] | Header detection failed on sheet 'Stock Group Reorder Status': [Errno 2] No such file or directory: 'non_existent_file_path_999.xlsx'. Attempting matching sheet search...
+2026-08-03 15:31:26 | ERROR    | [pioneer_billing.import] | Header detection failed for stock sheet: [Errno 2] No such file or directory: 'non_existent_file_path_999.xlsx'
+Traceback (most recent call last):
+  File "A:\Project1\app\services\import_service.py", line 32, in import_inventory
+    df = cls.detect_headers_and_df(file_path, sheet_name, item_groups)
+  File "A:\Project1\app\services\import_service.py", line 24, in detect_headers_and_df
+    return ExcelHeaderDetector.detect_headers_and_df(file_path, sheet_name, mandatory_synonym_groups)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "A:\Project1\app\services\excel_header_detector.py", line 11, in detect_headers_and_df
+    df_raw = pd.read_excel(file_path, sheet_name=sheet_name, header=None, nrows=30)
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 481, in read_excel
+    io = ExcelFile(
+        io,
+    ...<2 lines>...
+        engine_kwargs=engine_kwargs,
+    )
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 1604, in __init__
+    ext = inspect_excel_format(
+        content_or_path=path_or_buffer, storage_options=storage_options
+    )
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 1452, in inspect_excel_format
+    with get_handle(
+         ~~~~~~~~~~^
+        content_or_path, "rb", storage_options=storage_options, is_text=False
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ) as handle:
+    ^
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\common.py", line 939, in get_handle
+    handle = open(handle, ioargs.mode)
+FileNotFoundError: [Errno 2] No such file or directory: 'non_existent_file_path_999.xlsx'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "A:\Project1\app\services\import_service.py", line 38, in import_inventory
+    xls = pd.ExcelFile(file_path)
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 1604, in __init__
+    ext = inspect_excel_format(
+        content_or_path=path_or_buffer, storage_options=storage_options
+    )
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 1452, in inspect_excel_format
+    with get_handle(
+         ~~~~~~~~~~^
+        content_or_path, "rb", storage_options=storage_options, is_text=False
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ) as handle:
+    ^
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\common.py", line 939, in get_handle
+    handle = open(handle, ioargs.mode)
+FileNotFoundError: [Errno 2] No such file or directory: 'non_existent_file_path_999.xlsx'
+2026-08-03 15:31:26 | INFO     | [pioneer_billing.import] | Starting inventory import from file 'corrupt.xlsx', sheet 'Stock Group Reorder Status'.
+2026-08-03 15:31:26 | WARNING  | [pioneer_billing.import] | Header detection failed on sheet 'Stock Group Reorder Status': Excel file format cannot be determined, you must specify an engine manually.. Attempting matching sheet search...
+2026-08-03 15:31:26 | ERROR    | [pioneer_billing.import] | Header detection failed for stock sheet: Excel file format cannot be determined, you must specify an engine manually.
+Traceback (most recent call last):
+  File "A:\Project1\app\services\import_service.py", line 32, in import_inventory
+    df = cls.detect_headers_and_df(file_path, sheet_name, item_groups)
+  File "A:\Project1\app\services\import_service.py", line 24, in detect_headers_and_df
+    return ExcelHeaderDetector.detect_headers_and_df(file_path, sheet_name, mandatory_synonym_groups)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "A:\Project1\app\services\excel_header_detector.py", line 11, in detect_headers_and_df
+    df_raw = pd.read_excel(file_path, sheet_name=sheet_name, header=None, nrows=30)
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 481, in read_excel
+    io = ExcelFile(
+        io,
+    ...<2 lines>...
+        engine_kwargs=engine_kwargs,
+    )
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 1608, in __init__
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: Excel file format cannot be determined, you must specify an engine manually.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "A:\Project1\app\services\import_service.py", line 38, in import_inventory
+    xls = pd.ExcelFile(file_path)
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 1608, in __init__
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: Excel file format cannot be determined, you must specify an engine manually.
+2026-08-03 15:31:28 | WARNING  | [pioneer_billing.app] | Connector REST API unavailable at http://localhost:8000/api/v1/company: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/company (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it")). Falling back to local store.
+2026-08-03 15:31:32 | WARNING  | [pioneer_billing.app] | Connector REST API unavailable at http://localhost:8000/api/v1/stock: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/stock (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it")). Falling back to local store.
+2026-08-03 15:31:36 | WARNING  | [pioneer_billing.app] | Connector REST API unavailable at http://localhost:8000/api/v1/stock/groups: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/stock/groups (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it")). Falling back to local store.
+2026-08-03 15:31:40 | WARNING  | [pioneer_billing.app] | Connector REST API unavailable at http://localhost:8000/api/v1/customers: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/customers (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it")). Falling back to local store.
+2026-08-03 15:31:44 | WARNING  | [pioneer_billing.app] | Connector REST API unavailable at http://localhost:8000/api/v1/stock: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/stock (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it")). Falling back to local store.
+2026-08-03 15:31:48 | WARNING  | [pioneer_billing.app] | Connector REST API unavailable at http://localhost:8000/api/v1/ledgers: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/ledgers (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it")). Falling back to local store.
+2026-08-03 15:31:52 | WARNING  | [pioneer_billing.app] | Connector REST API unavailable at http://localhost:8000/api/v1/stock: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/stock (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it")). Falling back to local store.
+2026-08-03 15:31:52 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 13
+2026-08-03 15:31:52 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01013' (ID: 13) for order_id 13.
+2026-08-03 15:31:52 | INFO     | [pioneer_billing.import] | Starting inventory import from file 'uploaded_file.xlsx', sheet 'Stock Group Reorder Status'.
+2026-08-03 15:31:52 | WARNING  | [pioneer_billing.import] | Header detection failed on sheet 'Stock Group Reorder Status': [Errno 2] No such file or directory: 'non_existent_file_path_999.xlsx'. Attempting matching sheet search...
+2026-08-03 15:31:52 | ERROR    | [pioneer_billing.import] | Header detection failed for stock sheet: [Errno 2] No such file or directory: 'non_existent_file_path_999.xlsx'
+Traceback (most recent call last):
+  File "A:\Project1\app\services\import_service.py", line 32, in import_inventory
+    df = cls.detect_headers_and_df(file_path, sheet_name, item_groups)
+  File "A:\Project1\app\services\import_service.py", line 24, in detect_headers_and_df
+    return ExcelHeaderDetector.detect_headers_and_df(file_path, sheet_name, mandatory_synonym_groups)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "A:\Project1\app\services\excel_header_detector.py", line 11, in detect_headers_and_df
+    df_raw = pd.read_excel(file_path, sheet_name=sheet_name, header=None, nrows=30)
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 481, in read_excel
+    io = ExcelFile(
+        io,
+    ...<2 lines>...
+        engine_kwargs=engine_kwargs,
+    )
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 1604, in __init__
+    ext = inspect_excel_format(
+        content_or_path=path_or_buffer, storage_options=storage_options
+    )
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 1452, in inspect_excel_format
+    with get_handle(
+         ~~~~~~~~~~^
+        content_or_path, "rb", storage_options=storage_options, is_text=False
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ) as handle:
+    ^
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\common.py", line 939, in get_handle
+    handle = open(handle, ioargs.mode)
+FileNotFoundError: [Errno 2] No such file or directory: 'non_existent_file_path_999.xlsx'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "A:\Project1\app\services\import_service.py", line 38, in import_inventory
+    xls = pd.ExcelFile(file_path)
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 1604, in __init__
+    ext = inspect_excel_format(
+        content_or_path=path_or_buffer, storage_options=storage_options
+    )
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 1452, in inspect_excel_format
+    with get_handle(
+         ~~~~~~~~~~^
+        content_or_path, "rb", storage_options=storage_options, is_text=False
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ) as handle:
+    ^
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\common.py", line 939, in get_handle
+    handle = open(handle, ioargs.mode)
+FileNotFoundError: [Errno 2] No such file or directory: 'non_existent_file_path_999.xlsx'
+2026-08-03 15:31:52 | INFO     | [pioneer_billing.import] | Starting inventory import from file 'corrupt.xlsx', sheet 'Stock Group Reorder Status'.
+2026-08-03 15:31:52 | WARNING  | [pioneer_billing.import] | Header detection failed on sheet 'Stock Group Reorder Status': Excel file format cannot be determined, you must specify an engine manually.. Attempting matching sheet search...
+2026-08-03 15:31:52 | ERROR    | [pioneer_billing.import] | Header detection failed for stock sheet: Excel file format cannot be determined, you must specify an engine manually.
+Traceback (most recent call last):
+  File "A:\Project1\app\services\import_service.py", line 32, in import_inventory
+    df = cls.detect_headers_and_df(file_path, sheet_name, item_groups)
+  File "A:\Project1\app\services\import_service.py", line 24, in detect_headers_and_df
+    return ExcelHeaderDetector.detect_headers_and_df(file_path, sheet_name, mandatory_synonym_groups)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "A:\Project1\app\services\excel_header_detector.py", line 11, in detect_headers_and_df
+    df_raw = pd.read_excel(file_path, sheet_name=sheet_name, header=None, nrows=30)
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 481, in read_excel
+    io = ExcelFile(
+        io,
+    ...<2 lines>...
+        engine_kwargs=engine_kwargs,
+    )
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 1608, in __init__
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: Excel file format cannot be determined, you must specify an engine manually.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "A:\Project1\app\services\import_service.py", line 38, in import_inventory
+    xls = pd.ExcelFile(file_path)
+  File "A:\Project1\.venv\Lib\site-packages\pandas\io\excel\_base.py", line 1608, in __init__
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: Excel file format cannot be determined, you must specify an engine manually.
