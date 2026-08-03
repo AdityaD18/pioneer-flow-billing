@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 from main import app
+from tally.connection import TallyConnectionManager
 
 client = TestClient(app)
 
@@ -14,11 +15,21 @@ def test_health_endpoint():
     response = client.get("/health")
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "healthy"
-    assert "tally_target" in data
+    assert "tally_health" in data
+    health = data["tally_health"]
+    assert "connected" in health
+    assert "response_time_ms" in health
+    assert "last_checked" in health
 
-def test_sync_trigger_endpoint():
-    response = client.post("/api/v1/sync/trigger")
+def test_tally_health_detail_endpoint():
+    response = client.get("/api/v1/health/tally")
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "initiated"
+    assert "connected" in data
+    assert "response_time_ms" in data
+
+def test_connection_manager_mock_parse():
+    xml_sample = """<ENVELOPE><BODY><DATA><COMPANYNAME>PIONEER AUTOMATION</COMPANYNAME><VERSION>7.1</VERSION></DATA></BODY></ENVELOPE>"""
+    company, version = TallyConnectionManager._parse_company_response(xml_sample)
+    assert company == "PIONEER AUTOMATION"
+    assert version == "TallyPrime 7.1"
