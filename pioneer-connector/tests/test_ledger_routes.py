@@ -3,7 +3,9 @@ import sys
 import unittest
 from unittest.mock import patch
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+connector_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if connector_dir not in sys.path:
+    sys.path.insert(0, connector_dir)
 
 from fastapi.testclient import TestClient
 from main import app
