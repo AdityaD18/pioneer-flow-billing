@@ -77,3 +77,18 @@ class BaseDataProvider(ABC):
     def sync_from_web_url(self, url, imported_by='Auto Sync'):
         """Syncs inventory stock data from a remote spreadsheet URL."""
         pass
+
+    @abstractmethod
+    def export_inventory_reorder_excel(self):
+        """Exports inventory reorder status sheet to Excel buffer."""
+        pass
+
+    @abstractmethod
+    def export_invoices_excel(self):
+        """Exports invoice ledger history to Excel buffer."""
+        pass
+
+    @abstractmethod
+    def export_quotations_excel(self):
+        """Exports quotation ledger history to Excel buffer."""
+        pass

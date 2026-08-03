@@ -1,13 +1,15 @@
 import os
 import streamlit as st
 import pandas as pd
-from app.services.import_service import ImportService
+from app.providers import get_data_provider
 from app.repositories.order_repository import OrderRepository
 from app.ui.styles import render_html, trigger_toast
 
 def render_settings_tab():
     render_html('<div class="section-head"><i class="fa-solid fa-sliders"></i> System Settings & Data Importers</div>')
     st.caption("Import inventory stock sheets, cost price lists, Google Sheets, or configure application tax defaults.")
+    
+    provider = get_data_provider()
     
     # 1. Tax & Configuration Defaults
     render_html('<div class="setting-section"><div class="setting-section-title"><i class="fa-solid fa-gear"></i> Default System Configuration</div></div>')
@@ -36,7 +38,7 @@ def render_settings_tab():
         up_stock = st.file_uploader("Choose Stock Excel File", type=["xlsx", "xls"], key="file_up_stock")
         if up_stock and st.button("🚀 Process Stock Import", type="primary", key="btn_imp_stock"):
             with st.spinner("Parsing stock reorder status sheet..."):
-                res = ImportService.import_inventory(up_stock, filename=up_stock.name, imported_by="Streamlit Admin")
+                res = provider.import_inventory(up_stock, filename=up_stock.name, imported_by="Streamlit Admin")
                 if res['status'] in ('success', 'partial_success'):
                     trigger_toast(f"Imported {res['successful_records']:,} stock records!", icon="✅")
                     st.rerun()
@@ -48,7 +50,7 @@ def render_settings_tab():
         up_cost = st.file_uploader("Choose Cost List Excel File", type=["xlsx", "xls"], key="file_up_cost")
         if up_cost and st.button("🚀 Process Cost List Import", type="primary", key="btn_imp_cost"):
             with st.spinner("Parsing cost list price sheet..."):
-                res = ImportService.import_costs(up_cost, filename=up_cost.name, imported_by="Streamlit Admin")
+                res = provider.import_costs(up_cost, filename=up_cost.name, imported_by="Streamlit Admin")
                 if res['status'] in ('success', 'partial_success'):
                     trigger_toast(f"Imported {res['successful_records']:,} cost rates!", icon="✅")
                     st.rerun()
@@ -60,7 +62,7 @@ def render_settings_tab():
         web_url = st.text_input("Enter Spreadsheet Web URL", placeholder="https://docs.google.com/spreadsheets/d/.../edit", key="input_web_url")
         if web_url and st.button("⚡ Sync From Web URL", key="btn_sync_web"):
             with st.spinner("Downloading and parsing remote spreadsheet..."):
-                res = ImportService.sync_from_web_url(web_url, imported_by="Web URL Sync")
+                res = provider.sync_from_web_url(web_url, imported_by="Web URL Sync")
                 if res['status'] in ('success', 'partial_success'):
                     trigger_toast(f"Synced {res['successful_records']:,} items from Web URL!", icon="🌐")
                     st.rerun()

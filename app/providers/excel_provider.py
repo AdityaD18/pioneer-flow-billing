@@ -7,6 +7,7 @@ from app.repositories.invoice_repository import InvoiceRepository
 from app.repositories.quotation_repository import QuotationRepository
 from app.services.import_service import ImportService
 from app.services.invoice_service import InvoiceService
+from app.services.excel_export_service import ExcelExportService
 from app.core.config import Config
 from app.core.constants import EXCEL_STOCK_SHEET_NAME, EXCEL_COST_SHEET_NAME
 
@@ -70,3 +71,12 @@ class ExcelDataProvider(BaseDataProvider):
 
     def sync_from_web_url(self, url, imported_by='Auto Sync'):
         return ImportService.sync_from_web_url(url, imported_by=imported_by)
+
+    def export_inventory_reorder_excel(self):
+        return ExcelExportService.export_inventory_reorder_excel()
+
+    def export_invoices_excel(self):
+        return ExcelExportService.export_invoices_excel()
+
+    def export_quotations_excel(self):
+        return ExcelExportService.export_quotations_excel()
