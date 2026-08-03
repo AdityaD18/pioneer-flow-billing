@@ -1,16 +1,16 @@
 from typing import Dict, Type
 from app.providers.base_provider import BaseDataProvider
 from app.providers.excel_provider import ExcelDataProvider
+from app.core.config import Config
 from app.core.logger import app_logger
 
 class ProviderFactory:
-    """Factory managing source-agnostic Data Provider instances for Pioneer Flow Billing."""
+    """Factory managing source-agnostic Data Provider instances driven by configuration."""
     
     _registry: Dict[str, Type[BaseDataProvider]] = {
         "excel": ExcelDataProvider
     }
     _instances: Dict[str, BaseDataProvider] = {}
-    _active_provider_name: str = "excel"
 
     @classmethod
     def register_provider(cls, name: str, provider_class: Type[BaseDataProvider]):
@@ -19,24 +19,25 @@ class ProviderFactory:
         app_logger.info(f"Registered Data Provider '{name.lower()}' ({provider_class.__name__}).")
 
     @classmethod
-    def set_active_provider(cls, name: str):
-        """Sets the globally active Data Provider type."""
-        name_clean = name.lower()
-        if name_clean not in cls._registry:
-            raise ValueError(f"Provider '{name}' is not registered with ProviderFactory. Available: {list(cls._registry.keys())}")
-        cls._active_provider_name = name_clean
-        app_logger.info(f"Set active Data Provider to '{name_clean}'.")
+    def get_configured_provider_name(cls) -> str:
+        """Reads the configured DATA_PROVIDER setting from Config."""
+        return Config.DATA_PROVIDER.lower()
 
     @classmethod
     def get_provider(cls, name: str = None) -> BaseDataProvider:
         """
         Obtains a Data Provider instance.
-        If no name is specified, returns the currently active Data Provider.
+        If no name is specified, reads from Config.DATA_PROVIDER.
+        Falls back to 'excel' if an unregistered provider type is requested.
         """
-        provider_name = (name or cls._active_provider_name).lower()
+        provider_name = (name or cls.get_configured_provider_name()).lower()
         
         if provider_name not in cls._registry:
-            raise ValueError(f"Provider '{provider_name}' is not registered with ProviderFactory.")
+            app_logger.warning(
+                f"Requested provider '{provider_name}' is not currently registered. "
+                f"Available: {list(cls._registry.keys())}. Falling back to default 'excel' provider."
+            )
+            provider_name = "excel"
             
         if provider_name not in cls._instances:
             provider_class = cls._registry[provider_name]

@@ -25,6 +25,9 @@ class Config:
     APP_VERSION = _get_env('APP_VERSION', '1.0.0')
     APP_ENV = _get_env('APP_ENV', 'development')
     
+    # Active Data Provider (Supported: 'excel' | Future: 'tally', 'postgres', 'api')
+    DATA_PROVIDER = _get_env('DATA_PROVIDER', 'excel').lower()
+    
     # Company Profile & Branding Defaults
     COMPANY_NAME = _get_env('COMPANY_NAME', 'Pioneer Flow Billing ERP')
     COMPANY_SUBTITLE = _get_env('COMPANY_SUBTITLE', 'Mechanical Parts Inventory Management & Automated Billing Engine')
