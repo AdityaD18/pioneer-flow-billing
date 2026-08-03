@@ -1,7 +1,7 @@
 import xml.etree.ElementTree as ET
 from typing import List, Dict, Any, Optional
 from tally.parser.xml_validator import TallyXMLValidator
-from tally.models.stock import TallyStockItem
+from tally.models.stock import TallyStockItem, TallyStockGroup
 from tally.models.ledger import TallyLedger
 
 class TallyXMLParser:
@@ -47,6 +47,30 @@ class TallyXMLParser:
         return ledgers
 
     @classmethod
+    def parse_stock_groups(cls, xml_content: str) -> List[TallyStockGroup]:
+        """Parses Tally Stock Groups XML response into a list of TallyStockGroup instances."""
+        root = TallyXMLValidator.validate_xml(xml_content)
+        groups = []
+
+        for elem in root.iter():
+            if elem.tag.upper() in ("STOCKGROUP", "STOCKITEMGROUP"):
+                name_elem = elem.find("NAME") or elem.find(".//NAME")
+                if name_elem is not None and name_elem.text:
+                    guid_elem = elem.find("GUID")
+                    parent_elem = elem.find("PARENT")
+                    name = name_elem.text.strip()
+                    series = name.split()[0] if name else None
+
+                    groups.append(TallyStockGroup(
+                        guid=guid_elem.text.strip() if guid_elem is not None and guid_elem.text else None,
+                        name=name,
+                        parent_group=parent_elem.text.strip() if parent_elem is not None and parent_elem.text else "Primary",
+                        series_code=series
+                    ))
+
+        return groups
+
+    @classmethod
     def parse_stock_items(cls, xml_content: str) -> List[TallyStockItem]:
         """Parses Tally Stock Items XML response into a list of TallyStockItem instances."""
         root = TallyXMLValidator.validate_xml(xml_content)
@@ -70,9 +94,19 @@ class TallyXMLParser:
                     rate_elem = elem.find("CLOSINGRATE")
                     val_elem = elem.find("CLOSINGVALUE")
 
+                    purc_elem = elem.find("PURCHASEORDERSDUE") or elem.find("PURCHASEPENDING")
+                    sales_elem = elem.find("SALESORDERSDUE") or elem.find("SALEDUE")
+                    reorder_elem = elem.find("REORDERLEVEL")
+
                     closing_bal = cls._parse_numeric(bal_elem)
                     closing_rate = cls._parse_numeric(rate_elem)
                     closing_val = cls._parse_numeric(val_elem)
+                    purc_pending = cls._parse_numeric(purc_elem)
+                    sales_due = cls._parse_numeric(sales_elem)
+                    reorder_lvl = cls._parse_numeric(reorder_elem)
+
+                    nett_avail = closing_bal + purc_pending - sales_due
+                    shortfall = max(0.0, reorder_lvl - nett_avail)
 
                     items.append(TallyStockItem(
                         guid=guid_elem.text.strip() if guid_elem is not None and guid_elem.text else None,
@@ -81,7 +115,12 @@ class TallyXMLParser:
                         part_number=part_elem.text.strip() if part_elem is not None and part_elem.text else name_elem.text.strip(),
                         closing_balance=closing_bal,
                         closing_rate=closing_rate,
-                        closing_value=closing_val
+                        closing_value=closing_val,
+                        purchase_pending=purc_pending,
+                        sales_due=sales_due,
+                        nett_available=nett_avail,
+                        reorder_level=reorder_lvl,
+                        shortfall=shortfall
                     ))
 
         return items
