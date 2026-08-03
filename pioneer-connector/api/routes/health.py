@@ -11,7 +11,7 @@ def health_check(
 ):
     """
     Tally Connection Health Check Endpoint.
-    Probes TallyPrime XML server, detects active company & version, and measures latency.
+    Probes TallyPrime HTTP server, detects active company & version, and measures latency.
     """
     tally_health = TallyConnectionManager.test_connection(host=host, port=port)
     return {
@@ -19,11 +19,3 @@ def health_check(
         "environment": settings.APP_ENV,
         "tally_health": tally_health
     }
-
-@router.get("/api/v1/health/tally")
-def tally_health_detail(
-    host: str = Query(None, description="Optional override Tally host"),
-    port: int = Query(None, description="Optional override Tally port")
-):
-    """Detailed TallyPrime XML HTTP status endpoint."""
-    return TallyConnectionManager.test_connection(host=host, port=port)

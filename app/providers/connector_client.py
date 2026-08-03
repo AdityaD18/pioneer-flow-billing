@@ -12,7 +12,7 @@ class ConnectorClient:
     """
 
     def __init__(self, base_url: Optional[str] = None, timeout: float = 3.0, max_retries: int = 2):
-        self.base_url = (base_url or os.environ.get("CONNECTOR_API_URL") or "http://localhost:8000/api/v1").rstrip('/')
+        self.base_url = (base_url or os.environ.get("CONNECTOR_API_URL") or "http://localhost:8000").rstrip('/')
         self.timeout = timeout
         self.max_retries = max_retries
         self.session = requests.Session()

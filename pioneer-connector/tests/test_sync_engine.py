@@ -17,7 +17,7 @@ class TestSyncEngine(unittest.TestCase):
         ConnectorCacheDB.init_cache_db()
 
     def test_sync_status_endpoint(self):
-        response = self.client.get("/api/v1/sync/status")
+        response = self.client.get("/sync/status")
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertIn("status", data)

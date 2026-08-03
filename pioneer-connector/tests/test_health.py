@@ -21,13 +21,6 @@ def test_health_endpoint():
     assert "response_time_ms" in health
     assert "last_checked" in health
 
-def test_tally_health_detail_endpoint():
-    response = client.get("/api/v1/health/tally")
-    assert response.status_code == 200
-    data = response.json()
-    assert "connected" in data
-    assert "response_time_ms" in data
-
 def test_connection_manager_mock_parse():
     xml_sample = """<ENVELOPE><BODY><DATA><COMPANYNAME>PIONEER AUTOMATION</COMPANYNAME><VERSION>7.1</VERSION></DATA></BODY></ENVELOPE>"""
     company, version = TallyConnectionManager._parse_company_response(xml_sample)

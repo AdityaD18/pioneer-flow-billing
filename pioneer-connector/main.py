@@ -16,11 +16,6 @@ app.include_router(stock.router)
 app.include_router(ledgers.router)
 app.include_router(sync.router)
 
-# Also register under /api/v1 prefix for versioned clients
-app.include_router(sync.router, prefix=settings.API_PREFIX)
-app.include_router(stock.router, prefix=settings.API_PREFIX)
-app.include_router(ledgers.router, prefix=settings.API_PREFIX)
-
 @app.get("/")
 def root():
     return {
@@ -33,6 +28,7 @@ def root():
             "/stock",
             "/stock/groups",
             "/customers",
+            "/suppliers",
             "/ledgers",
             "/sync/status",
             "/sync/full",

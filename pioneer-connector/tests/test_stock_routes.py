@@ -26,7 +26,7 @@ class TestStockRoutes(unittest.TestCase):
         ]
 
     def test_get_all_stock(self):
-        response = self.client.get("/api/v1/stock")
+        response = self.client.get("/stock")
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["status"], "success")
@@ -34,13 +34,13 @@ class TestStockRoutes(unittest.TestCase):
         self.assertEqual(data["items"][0]["part_number"], "209-120")
 
     def test_get_stock_by_id_success(self):
-        response = self.client.get("/api/v1/stock/209-120")
+        response = self.client.get("/stock/209-120")
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["name"], "209-120")
 
     def test_get_stock_by_id_not_found(self):
-        response = self.client.get("/api/v1/stock/NON-EXISTENT-PART")
+        response = self.client.get("/stock/NON-EXISTENT-PART")
         self.assertEqual(response.status_code, 404)
 
 if __name__ == '__main__':
