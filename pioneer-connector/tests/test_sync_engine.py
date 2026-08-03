@@ -1,10 +1,12 @@
 import os
 import sys
+
+connector_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if connector_dir not in sys.path:
+    sys.path.insert(0, connector_dir)
+
 import unittest
 from fastapi.testclient import TestClient
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 from main import app
 from services.sync_engine import SyncEngine
 from cache.sqlite_cache import ConnectorCacheDB
