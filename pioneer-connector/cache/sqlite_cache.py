@@ -9,17 +9,33 @@ CACHE_DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "connect
 
 class ConnectorCacheDB:
     """SQLite cache database preserving Tally data for instant API serving and offline resilience."""
+    db_path = CACHE_DB_PATH
 
     @classmethod
     def get_connection(cls) -> sqlite3.Connection:
-        conn = sqlite3.connect(CACHE_DB_PATH)
+        target_path = getattr(cls, 'db_path', CACHE_DB_PATH)
+        conn = sqlite3.connect(target_path)
         conn.row_factory = sqlite3.Row
         return conn
 
     @classmethod
+    def clear_all(cls):
+        """Clears all cached tables for testing isolation."""
+        conn = cls.get_connection()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM cached_stock_items;")
+        cur.execute("DELETE FROM cached_stock_groups;")
+        cur.execute("DELETE FROM cached_ledgers;")
+        cur.execute("DELETE FROM sync_metadata;")
+        conn.commit()
+        cur.close()
+        conn.close()
+
+    @classmethod
     def init_cache_db(cls):
         """Initializes cache tables and indexes."""
-        os.makedirs(os.path.dirname(CACHE_DB_PATH), exist_ok=True)
+        target_path = getattr(cls, 'db_path', CACHE_DB_PATH)
+        os.makedirs(os.path.dirname(os.path.abspath(target_path)), exist_ok=True)
         conn = cls.get_connection()
         cur = conn.cursor()
 

@@ -10,18 +10,18 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 from main import app
 from cache.sqlite_cache import ConnectorCacheDB
-from cache.models import CanonicalLedger
+from tally.models.ledger import TallyLedger as CanonicalLedger
 
 class TestLedgerRoutes(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
         # Use isolated test DB for cache tests
-        self.test_db_path = "test_ledger_cache.db"
+        self.test_db_path = os.path.abspath("test_ledger_cache.db")
         self.cache_patcher = patch("cache.sqlite_cache.ConnectorCacheDB.db_path", self.test_db_path)
         self.cache_patcher.start()
         
-        self.cache = ConnectorCacheDB(db_path=self.test_db_path)
-        self.cache.clear_all()
+        ConnectorCacheDB.init_cache_db()
+        ConnectorCacheDB.clear_all()
         self._seed_data()
 
     def tearDown(self):
@@ -33,7 +33,7 @@ class TestLedgerRoutes(unittest.TestCase):
                 pass
 
     def _seed_data(self):
-        self.cache.save_ledgers([
+        ConnectorCacheDB.save_ledgers([
             CanonicalLedger(
                 guid="LEDGER-001",
                 name="Acme Automation India Ltd",
@@ -41,7 +41,7 @@ class TestLedgerRoutes(unittest.TestCase):
                 ledger_type="customer",
                 closing_balance=125000.0,
                 gstin="27AAACA1234F1Z1",
-                state_name="Maharashtra"
+                state="Maharashtra"
             ),
             CanonicalLedger(
                 guid="LEDGER-002",
