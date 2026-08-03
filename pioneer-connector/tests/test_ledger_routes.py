@@ -1,12 +1,12 @@
 import os
 import sys
-import unittest
-from unittest.mock import patch
 
 connector_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if connector_dir not in sys.path:
     sys.path.insert(0, connector_dir)
 
+import unittest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from main import app
 from cache.sqlite_cache import ConnectorCacheDB
