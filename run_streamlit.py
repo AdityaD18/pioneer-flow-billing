@@ -1,12 +1,3 @@
-import requests
-
-print("=" * 80)
-print("DIRECT REQUEST TEST")
-r = requests.get("http://localhost:8000/health", timeout=5)
-print(r.status_code)
-print(r.text)
-print("=" * 80)
-
 import os
 import streamlit as st
 from app.core.config import Config
