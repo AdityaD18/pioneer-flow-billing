@@ -1,0 +1,15 @@
+[2026-08-02 21:08:01,718] [WARNING] [TallyConnector]: ⚠️ HTTP POST to http://localhost:9000 failed (Attempt 1/3): <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>
+[2026-08-02 21:08:10,731] [WARNING] [TallyConnector]: ⚠️ HTTP POST to http://localhost:9000 failed (Attempt 2/3): <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>
+[2026-08-02 21:08:20,741] [WARNING] [TallyConnector]: ⚠️ HTTP POST to http://localhost:9000 failed (Attempt 3/3): <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>
+[2026-08-02 21:08:20,741] [ERROR] [TallyConnector]: ❌ HTTP POST to http://localhost:9000 failed after 3 retries.
+[2026-08-02 21:08:28,761] [WARNING] [TallyConnector]: ⚠️ HTTP POST to http://localhost:9000 failed (Attempt 1/3): <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>
+[2026-08-02 21:08:37,774] [WARNING] [TallyConnector]: ⚠️ HTTP POST to http://localhost:9000 failed (Attempt 2/3): <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>
+[2026-08-02 21:08:47,786] [WARNING] [TallyConnector]: ⚠️ HTTP POST to http://localhost:9000 failed (Attempt 3/3): <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>
+[2026-08-02 21:08:47,787] [ERROR] [TallyConnector]: ❌ HTTP POST to http://localhost:9000 failed after 3 retries.
+[2026-08-02 21:08:47,787] [WARNING] [TallyConnector]: Could not retrieve active company name: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>
+[2026-08-02 21:08:47,787] [INFO] [TallyConnector]: 🚀 Starting Full Tally Prime Synchronization...
+[2026-08-02 21:08:55,798] [WARNING] [TallyConnector]: ⚠️ HTTP POST to http://localhost:9000 failed (Attempt 1/3): <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>
+[2026-08-02 21:09:04,813] [WARNING] [TallyConnector]: ⚠️ HTTP POST to http://localhost:9000 failed (Attempt 2/3): <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>
+[2026-08-02 21:09:14,824] [WARNING] [TallyConnector]: ⚠️ HTTP POST to http://localhost:9000 failed (Attempt 3/3): <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>
+[2026-08-02 21:09:14,824] [ERROR] [TallyConnector]: ❌ HTTP POST to http://localhost:9000 failed after 3 retries.
+[2026-08-02 21:09:14,834] [ERROR] [TallyConnector]: ❌ Full Sync Failed: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>
