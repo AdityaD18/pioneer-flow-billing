@@ -2,6 +2,7 @@ import sqlite3
 from datetime import datetime
 from app.models.database import get_db, query_db, execute_db
 from app.core.constants import INVOICE_SEQ_PREFIX, DEFAULT_START_SEQ
+from app.core.logger import billing_logger
 
 class InvoiceService:
     @classmethod
@@ -10,17 +11,21 @@ class InvoiceService:
         Generates and persists a unique Invoice for a given order_id.
         Uses SQLite IMMEDIATE transaction sequencing to prevent duplicates in concurrent environments.
         """
+        billing_logger.info(f"Generating invoice for order_id: {order_id}")
         conn = get_db()
         cur = conn.cursor()
         
         # Verify order exists
         order = query_db("SELECT id FROM ORDERS WHERE id = ?", (order_id,), one=True)
         if not order:
-            raise ValueError(f"Order ID {order_id} not found.")
+            err_msg = f"Order ID {order_id} not found."
+            billing_logger.error(err_msg)
+            raise ValueError(err_msg)
             
         # Verify invoice doesn't already exist for this order
         existing = query_db("SELECT id, invoice_number FROM INVOICES WHERE order_id = ?", (order_id,), one=True)
         if existing:
+            billing_logger.info(f"Invoice already exists for order_id {order_id}: {existing['invoice_number']}")
             return existing['id']
             
         if not invoice_date:
@@ -60,9 +65,11 @@ class InvoiceService:
             invoice_id = cur.lastrowid
             
             conn.commit()
+            billing_logger.info(f"Successfully generated invoice '{invoice_number}' (ID: {invoice_id}) for order_id {order_id}.")
             return invoice_id
         except Exception as e:
             conn.rollback()
+            billing_logger.error(f"Failed to generate invoice for order_id {order_id}: {e}", exc_info=True)
             raise e
         finally:
             cur.close()
@@ -96,7 +103,6 @@ class InvoiceService:
         if not inv:
             return None
             
-        # Get order details
         order_id = inv['order_id']
         order_details = query_db("SELECT * FROM ORDERS WHERE id = ?", (order_id,), one=True)
         if not order_details:

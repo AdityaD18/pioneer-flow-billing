@@ -1,6 +1,10 @@
 import os
 import streamlit as st
 from app.core.config import Config
+from app.core.logger import app_logger
+
+# Log Application Startup
+app_logger.info(f"Starting {Config.APP_NAME} v{Config.APP_VERSION} ({Config.APP_ENV} mode)...")
 
 # Page Configuration
 st.set_page_config(

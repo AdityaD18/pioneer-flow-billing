@@ -4,6 +4,7 @@ from app.models.database import get_db, query_db, get_db_connection
 from app.services.customer_service import CustomerService
 from app.services.order_service import OrderService
 from app.core.constants import QUOTATION_SEQ_PREFIX, DEFAULT_START_SEQ
+from app.core.logger import billing_logger
 
 class QuotationService:
     @classmethod
@@ -12,6 +13,7 @@ class QuotationService:
         Creates and persists a Quotation with a unique sequential QTN number.
         Uses SQLite IMMEDIATE transaction sequencing to prevent duplicates.
         """
+        billing_logger.info(f"Generating quotation for customer: {customer_input.get('name')}")
         conn = get_db()
         cur = conn.cursor()
         
@@ -23,7 +25,9 @@ class QuotationService:
         payment_terms = customer_input.get('payment_terms')
         
         if not customer_name:
-            raise ValueError("Customer name is required.")
+            err_msg = "Customer name is required."
+            billing_logger.error(err_msg)
+            raise ValueError(err_msg)
             
         cust = None
         if customer_id:
@@ -107,9 +111,11 @@ class QuotationService:
                 )
                 
             conn.commit()
+            billing_logger.info(f"Successfully generated quotation '{quotation_number}' (ID: {quotation_id}) for customer '{customer_name}'.")
             return quotation_id
         except Exception as e:
             conn.rollback()
+            billing_logger.error(f"Failed to generate quotation for customer '{customer_name}': {e}", exc_info=True)
             raise e
         finally:
             cur.close()
@@ -143,7 +149,6 @@ class QuotationService:
             
         items = query_db("SELECT * FROM QUOTATION_ITEMS WHERE quotation_id = ?", (quotation_id,))
         
-        # Structure payload to match invoice details layout for easy visual reuse
         result = dict(q)
         result['order'] = {
             "order_number": q['quotation_number'],

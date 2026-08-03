@@ -6,6 +6,7 @@ from datetime import datetime
 from app.models.database import get_db_connection, execute_db, query_db
 from app.services.excel_header_detector import ExcelHeaderDetector
 from app.core.config import Config
+from app.core.logger import import_logger
 from app.core.constants import (
     EXCEL_STOCK_SHEET_NAME, EXCEL_COST_SHEET_NAME,
     ITEM_CODE_SYNONYMS, CLOSING_STOCK_SYNONYMS, PURC_PENDING_SYNONYMS,
@@ -23,10 +24,12 @@ class ImportService:
     @classmethod
     def import_inventory(cls, file_path, sheet_name=EXCEL_STOCK_SHEET_NAME, filename='uploaded_file.xlsx', imported_by=None):
         """Imports inventory quantities into the SQLite database with robust upserts and logging."""
+        import_logger.info(f"Starting inventory import from file '{filename}', sheet '{sheet_name}'.")
         item_groups = [ITEM_CODE_SYNONYMS]
         try:
             df = cls.detect_headers_and_df(file_path, sheet_name, item_groups)
         except Exception as e:
+            import_logger.warning(f"Header detection failed on sheet '{sheet_name}': {e}. Attempting matching sheet search...")
             try:
                 if hasattr(file_path, 'seek'):
                     file_path.seek(0)
@@ -36,13 +39,16 @@ class ImportService:
                     matching_sheets = xls.sheet_names
                 df = cls.detect_headers_and_df(file_path, matching_sheets[0], item_groups)
                 sheet_name = matching_sheets[0]
+                import_logger.info(f"Successfully matched fallback stock sheet '{sheet_name}'.")
             except Exception as ex:
+                err_msg = f"Header detection failed for stock sheet: {str(ex)}"
+                import_logger.error(err_msg, exc_info=True)
                 return {
                     "status": "failed",
                     "total_records": 0,
                     "successful_records": 0,
                     "failed_records": 0,
-                    "errors": [f"Header detection failed for stock sheet: {str(ex)}"]
+                    "errors": [err_msg]
                 }
 
         find_col = ExcelHeaderDetector.find_matching_column
@@ -50,12 +56,14 @@ class ImportService:
         # Resolve columns using centralized constants
         item_code_col = find_col(df.columns, ITEM_CODE_SYNONYMS)
         if not item_code_col:
+            err_msg = "Could not locate an Item Code / Part Number column in inventory sheet."
+            import_logger.error(err_msg)
             return {
                 "status": "failed",
                 "total_records": 0,
                 "successful_records": 0,
                 "failed_records": 0,
-                "errors": ["Could not locate an Item Code / Part Number column in inventory sheet."]
+                "errors": [err_msg]
             }
 
         stock_col = find_col(df.columns, CLOSING_STOCK_SYNONYMS)
@@ -178,10 +186,14 @@ class ImportService:
                 cur.execute(f"RELEASE SAVEPOINT {savepoint_name};")
                 successful_records += 1
             except Exception as row_error:
-                try: cur.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name};")
-                except: pass
+                try:
+                    cur.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name};")
+                except Exception as rollback_err:
+                    import_logger.warning(f"Rollback to savepoint {savepoint_name} failed: {rollback_err}")
                 failed_records += 1
-                errors.append(f"Row {idx + 2}: {str(row_error)}")
+                err_text = f"Row {idx + 2}: {str(row_error)}"
+                errors.append(err_text)
+                import_logger.warning(f"Inventory row processing error - {err_text}")
         
         cur.execute("COMMIT;")
         conn.close()
@@ -195,6 +207,7 @@ class ImportService:
             ('inventory', filename, total_records, successful_records, failed_records, imported_by, status)
         )
         
+        import_logger.info(f"Inventory import finished ({status}): {successful_records}/{total_records} successful, {failed_records} failed.")
         return {
             "status": status,
             "total_records": total_records,
@@ -210,6 +223,7 @@ class ImportService:
         from io import BytesIO
         
         url_clean = url.strip()
+        import_logger.info(f"Initiating remote web spreadsheet sync from URL: {url_clean}")
         if "docs.google.com/spreadsheets" in url_clean and "/edit" in url_clean:
             url_clean = url_clean.split("/edit")[0] + "/export?format=xlsx"
             
@@ -228,23 +242,28 @@ class ImportService:
                 filename='google_sheets.xlsx', 
                 imported_by=imported_by
             )
+            import_logger.info(f"Web spreadsheet sync completed successfully: {result['successful_records']} records processed.")
             return result
         except Exception as e:
+            err_msg = f"Web fetch failed: {str(e)}"
+            import_logger.error(err_msg, exc_info=True)
             return {
                 "status": "failed",
                 "total_records": 0,
                 "successful_records": 0,
                 "failed_records": 0,
-                "errors": [f"Web fetch failed: {str(e)}"]
+                "errors": [err_msg]
             }
 
     @classmethod
     def import_costs(cls, file_path, sheet_name=EXCEL_COST_SHEET_NAME, filename='uploaded_file.xlsx', imported_by=None):
         """Imports product cost prices into the SQLite database, managing is_current historical tags."""
+        import_logger.info(f"Starting cost list import from file '{filename}', sheet '{sheet_name}'.")
         item_groups = [ITEM_CODE_SYNONYMS]
         try:
             df = cls.detect_headers_and_df(file_path, sheet_name, item_groups)
         except Exception as e:
+            import_logger.warning(f"Header detection failed on cost sheet '{sheet_name}': {e}. Searching fallback sheets...")
             try:
                 xls = pd.ExcelFile(file_path)
                 matching_sheets = [s for s in xls.sheet_names if 'price' in s.lower() or 'cost' in s.lower() or 'rate' in s.lower()]
@@ -252,13 +271,16 @@ class ImportService:
                     matching_sheets = xls.sheet_names
                 df = cls.detect_headers_and_df(file_path, matching_sheets[0], item_groups)
                 sheet_name = matching_sheets[0]
+                import_logger.info(f"Matched fallback cost sheet '{sheet_name}'.")
             except Exception as ex:
+                err_msg = f"Header detection failed for cost list: {str(ex)}"
+                import_logger.error(err_msg, exc_info=True)
                 return {
                     "status": "failed",
                     "total_records": 0,
                     "successful_records": 0,
                     "failed_records": 0,
-                    "errors": [f"Header detection failed for cost list: {str(ex)}"]
+                    "errors": [err_msg]
                 }
 
         find_col = ExcelHeaderDetector.find_matching_column
@@ -266,22 +288,26 @@ class ImportService:
         # Resolve columns using centralized constants
         item_code_col = find_col(df.columns, ITEM_CODE_SYNONYMS)
         if not item_code_col:
+            err_msg = "Could not locate an Item Code / Part Number column in price sheet."
+            import_logger.error(err_msg)
             return {
                 "status": "failed",
                 "total_records": 0,
                 "successful_records": 0,
                 "failed_records": 0,
-                "errors": ["Could not locate an Item Code / Part Number column in price sheet."]
+                "errors": [err_msg]
             }
         
         price_col = find_col(df.columns, PRICE_SYNONYMS)
         if not price_col:
+            err_msg = f"Could not identify a price column in the sheet. Columns: {df.columns.tolist()}"
+            import_logger.error(err_msg)
             return {
                 "status": "failed",
                 "total_records": 0,
                 "successful_records": 0,
                 "failed_records": 0,
-                "errors": [f"Could not identify a price column in the sheet. Columns: {df.columns.tolist()}"]
+                "errors": [err_msg]
             }
 
         packing_col = find_col(df.columns, PACKING_QTY_SYNONYMS)
@@ -373,10 +399,14 @@ class ImportService:
                 cur.execute(f"RELEASE SAVEPOINT {savepoint_name};")
                 successful_records += 1
             except Exception as row_error:
-                try: cur.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name};")
-                except: pass
+                try:
+                    cur.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name};")
+                except Exception as rollback_err:
+                    import_logger.warning(f"Rollback to savepoint {savepoint_name} failed: {rollback_err}")
                 failed_records += 1
-                errors.append(f"Row {idx + 2}: {str(row_error)}")
+                err_text = f"Row {idx + 2}: {str(row_error)}"
+                errors.append(err_text)
+                import_logger.warning(f"Cost row processing error - {err_text}")
         
         cur.execute("COMMIT;")
         conn.close()
@@ -390,6 +420,7 @@ class ImportService:
             ('cost', filename, total_records, successful_records, failed_records, imported_by, status)
         )
         
+        import_logger.info(f"Cost list import finished ({status}): {successful_records}/{total_records} successful, {failed_records} failed.")
         return {
             "status": status,
             "total_records": total_records,

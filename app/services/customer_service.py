@@ -1,6 +1,7 @@
 import sqlite3
 from datetime import datetime
 from app.models.database import query_db, execute_db
+from app.core.logger import billing_logger
 
 class CustomerService:
     @staticmethod
@@ -34,12 +35,16 @@ class CustomerService:
         """Creates a new customer record."""
         name_clean = name.strip()
         if not name_clean:
-            raise ValueError("Customer name cannot be empty.")
+            err_msg = "Customer name cannot be empty."
+            billing_logger.warning(f"Customer creation failed: {err_msg}")
+            raise ValueError(err_msg)
         
         # Check if already exists
         existing = CustomerService.get_customer_by_name(name_clean)
         if existing:
-            raise ValueError(f"Customer with name '{name_clean}' already exists.")
+            err_msg = f"Customer with name '{name_clean}' already exists."
+            billing_logger.warning(f"Customer creation failed: {err_msg}")
+            raise ValueError(err_msg)
         
         try:
             discount = float(discount_percentage)
@@ -52,6 +57,7 @@ class CustomerService:
                VALUES (?, ?, ?, ?, ?, ?)""",
             (name_clean, discount, gst_number or None, payment_terms or None, now_str, now_str)
         )
+        billing_logger.info(f"Created customer '{name_clean}' (ID: {customer_id}, Discount: {discount}%).")
         return CustomerService.get_customer_by_id(customer_id)
 
     @staticmethod
@@ -59,16 +65,21 @@ class CustomerService:
         """Updates an existing customer record."""
         customer = CustomerService.get_customer_by_id(customer_id)
         if not customer:
-            raise ValueError("Customer not found.")
+            err_msg = "Customer not found."
+            billing_logger.warning(f"Customer update failed (ID {customer_id}): {err_msg}")
+            raise ValueError(err_msg)
         
         name_clean = name.strip()
         if not name_clean:
-            raise ValueError("Customer name cannot be empty.")
+            err_msg = "Customer name cannot be empty."
+            billing_logger.warning(f"Customer update failed (ID {customer_id}): {err_msg}")
+            raise ValueError(err_msg)
             
-        # Check duplicate name on other records
         existing = CustomerService.get_customer_by_name(name_clean)
         if existing and existing['id'] != int(customer_id):
-            raise ValueError(f"Another customer with name '{name_clean}' already exists.")
+            err_msg = f"Another customer with name '{name_clean}' already exists."
+            billing_logger.warning(f"Customer update failed (ID {customer_id}): {err_msg}")
+            raise ValueError(err_msg)
             
         try:
             discount = float(discount_percentage)
@@ -82,6 +93,7 @@ class CustomerService:
                WHERE id = ?""",
             (name_clean, discount, gst_number or None, payment_terms or None, now_str, customer_id)
         )
+        billing_logger.info(f"Updated customer '{name_clean}' (ID: {customer_id}).")
         return CustomerService.get_customer_by_id(customer_id)
 
     @staticmethod
@@ -89,12 +101,16 @@ class CustomerService:
         """Deletes a customer record from the database."""
         customer = CustomerService.get_customer_by_id(customer_id)
         if not customer:
-            raise ValueError("Customer not found.")
+            err_msg = "Customer not found."
+            billing_logger.warning(f"Customer deletion failed (ID {customer_id}): {err_msg}")
+            raise ValueError(err_msg)
         
-        # Check if they have invoices/orders
         orders = query_db("SELECT id FROM ORDERS WHERE customer_id = ? LIMIT 1", (customer_id,))
         if orders:
-            raise ValueError("Cannot delete customer because they have order history associated with them.")
+            err_msg = "Cannot delete customer because they have order history associated with them."
+            billing_logger.warning(f"Customer deletion blocked for ID {customer_id}: {err_msg}")
+            raise ValueError(err_msg)
             
         execute_db("DELETE FROM CUSTOMERS WHERE id = ?", (customer_id,))
+        billing_logger.info(f"Deleted customer '{customer['name']}' (ID: {customer_id}).")
         return True
