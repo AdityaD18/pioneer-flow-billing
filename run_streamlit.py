@@ -24,6 +24,7 @@ from app.ui.views.billing import render_billing_tab
 from app.ui.views.history import render_history_tab
 from app.ui.views.customers import render_customers_tab
 from app.ui.views.settings import render_settings_tab
+from app.ui.views.sync_dashboard import render_sync_dashboard_tab
 
 # Initialize DB tables & seed data on startup
 init_db()
@@ -47,12 +48,13 @@ render_html(f"""
 render_connection_status()
 
 # Render Navigation Sidebar Tabs
-t_catalog, t_stock, t_billing, t_history, t_customers, t_settings = st.tabs([
+t_catalog, t_stock, t_billing, t_history, t_customers, t_sync, t_settings = st.tabs([
     "📦 Product Catalog",
     "📑 Stock Group Status",
     "📝 Invoice & Quote Builder",
     "📜 History Ledger",
     "👥 Customer Directory",
+    "🔄 Sync Dashboard",
     "⚙️ System Settings"
 ])
 
@@ -70,6 +72,9 @@ with t_history:
 
 with t_customers:
     render_customers_tab()
+
+with t_sync:
+    render_sync_dashboard_tab()
 
 with t_settings:
     render_settings_tab()
