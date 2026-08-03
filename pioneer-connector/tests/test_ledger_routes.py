@@ -6,14 +6,24 @@ from fastapi.testclient import TestClient
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from main import app
-from services.ledger_service import LedgerService
+from cache.sqlite_cache import ConnectorCacheDB
 from tally.models.ledger import TallyLedger
 
 class TestLedgerRoutes(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
-        # Mock cached ledgers for route testing
-        LedgerService._cache_ledgers = [
+        ConnectorCacheDB.init_cache_db()
+        
+        # Clear existing cached ledgers table for isolation
+        conn = ConnectorCacheDB.get_connection()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM cached_ledgers;")
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        # Seed mock cached ledgers into SQLite
+        ConnectorCacheDB.save_ledgers([
             TallyLedger(
                 guid="GUID-CUST-01",
                 name="Acme Automation India Ltd",
@@ -33,7 +43,7 @@ class TestLedgerRoutes(unittest.TestCase):
                 closing_balance=45000.0,
                 gstin="27AAACW9876F1Z0"
             )
-        ]
+        ])
 
     def test_get_all_ledgers(self):
         response = self.client.get("/api/v1/ledgers")
