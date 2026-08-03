@@ -4,36 +4,13 @@ import pandas as pd
 import sqlite3
 from datetime import datetime
 from app.models.database import get_db_connection, execute_db, query_db
+from app.services.excel_header_detector import ExcelHeaderDetector
 
 class ImportService:
     @staticmethod
     def detect_headers_and_df(file_path, sheet_name, mandatory_synonym_groups):
-        """Scans the first 30 rows of a sheet to locate the header row matching at least one synonym from each group."""
-        if hasattr(file_path, 'seek'):
-            file_path.seek(0)
-        df_raw = pd.read_excel(file_path, sheet_name=sheet_name, header=None, nrows=30)
-        
-        header_row_idx = None
-        for i, row in df_raw.iterrows():
-            row_str = [str(val).strip().lower() for val in row.values if pd.notna(val)]
-            
-            matched_groups = 0
-            for group in mandatory_synonym_groups:
-                if any(any(syn in cell_str for cell_str in row_str) for syn in group):
-                    matched_groups += 1
-            
-            if matched_groups >= len(mandatory_synonym_groups):
-                header_row_idx = i
-                break
-                
-        if header_row_idx is None:
-            raise ValueError(f"Could not find a valid header row containing part numbers in sheet '{sheet_name}'.")
-            
-        if hasattr(file_path, 'seek'):
-            file_path.seek(0)
-        df = pd.read_excel(file_path, sheet_name=sheet_name, header=header_row_idx)
-        df.columns = [str(c).strip() for c in df.columns]
-        return df
+        """Delegates header detection to ExcelHeaderDetector for backward compatibility."""
+        return ExcelHeaderDetector.detect_headers_and_df(file_path, sheet_name, mandatory_synonym_groups)
 
     @classmethod
     def import_inventory(cls, file_path, sheet_name='Stock Group Reorder Status', filename='uploaded_file.xlsx', imported_by=None):
@@ -60,19 +37,7 @@ class ImportService:
                     "errors": [f"Header detection failed for stock sheet: {str(ex)}"]
                 }
 
-        # Helper to find column key by exact match first, then substring match
-        def find_col(df_cols, syns):
-            # Exact match (case insensitive)
-            for c in df_cols:
-                c_clean = str(c).lower().strip()
-                if c_clean in syns:
-                    return c
-            # Substring match
-            for c in df_cols:
-                c_clean = str(c).lower().strip()
-                if any(syn in c_clean for syn in syns):
-                    return c
-            return None
+        find_col = ExcelHeaderDetector.find_matching_column
 
         # Resolve columns
         item_code_col = find_col(df.columns, ['item code', 'part number', 'part no', 'partno', 'code', 'item_code', 'part_no'])
@@ -134,7 +99,6 @@ class ImportService:
                 purc_val = parse_float_or_none(row, purc_col) or 0.0
                 sales_val = parse_float_or_none(row, sales_col) or 0.0
                 
-                # nett_available: if Excel cell has value, use it; otherwise compute: stock + purc - sales
                 nett_raw = parse_float_or_none(row, nett_col)
                 if nett_raw is not None:
                     nett_val = nett_raw
@@ -144,7 +108,6 @@ class ImportService:
                 reorder_raw = parse_float_or_none(row, reorder_col)
                 reorder_val = reorder_raw if reorder_raw is not None else 0.0
                 
-                # short_fall: if Excel cell has value, use it; otherwise compute: max(0, reorder - nett)
                 shortfall_raw = parse_float_or_none(row, shortfall_col)
                 if shortfall_raw is not None:
                     shortfall_val = shortfall_raw
@@ -215,7 +178,6 @@ class ImportService:
         cur.execute("COMMIT;")
         conn.close()
         
-        # Log this import
         status = 'success'
         if failed_records > 0:
             status = 'partial_success' if successful_records > 0 else 'failed'
@@ -308,7 +270,6 @@ class ImportService:
                 "errors": ["Could not locate an Item Code / Part Number column in price sheet."]
             }
         
-        # Prioritize 'decimal converted' or 'converted' or 'price/rate'
         price_col = None
         for search_syns in [['decimal converted', 'converted rate'], ['price', 'rate', 'mrp', 'cost']]:
             for c in df.columns:
@@ -361,7 +322,6 @@ class ImportService:
             try:
                 cur.execute(f"SAVEPOINT {savepoint_name};")
                 
-                # Resolve Price value
                 raw_price = row.get(price_col)
                 if pd.isna(raw_price):
                     raise ValueError("Price value is empty")
@@ -372,11 +332,9 @@ class ImportService:
                 except ValueError:
                     raise ValueError(f"Invalid price numeric value '{raw_price}'")
                 
-                # Standardize pricing unit (INR per 100 pcs)
                 if 'decimal' not in price_col.lower() and price_val > 100000 and int(price_val) == price_val:
                     price_val = price_val / 100.0
                 
-                # Resolve packing quantity
                 packing_qty = 1
                 if packing_col:
                     raw_packing = row.get(packing_col)
@@ -390,7 +348,6 @@ class ImportService:
                 if series_val == 'nan' or not series_val:
                     series_val = item_code.split('-')[0] if '-' in item_code else None
                 
-                # 1. Create or update product definition
                 cur.execute("SELECT id, packing_quantity FROM PRODUCTS WHERE part_number = ?", (item_code,))
                 prod = cur.fetchone()
                 if prod is None:
@@ -406,7 +363,6 @@ class ImportService:
                         (packing_qty, series_val, product_id)
                     )
                 
-                # 2. Check current active price
                 cur.execute(
                     "SELECT id, price_per_100_pcs FROM PRODUCT_COSTS WHERE product_id = ? AND is_current = 1",
                     (product_id,)
@@ -416,7 +372,7 @@ class ImportService:
                 price_changed = True
                 if active_cost:
                     if abs(active_cost['price_per_100_pcs'] - price_val) < 0.001:
-                        price_changed = False  # No change
+                        price_changed = False
                 
                 if price_changed:
                     if active_cost:
@@ -441,7 +397,6 @@ class ImportService:
         cur.execute("COMMIT;")
         conn.close()
         
-        # Log this import
         status = 'success'
         if failed_records > 0:
             status = 'partial_success' if successful_records > 0 else 'failed'
