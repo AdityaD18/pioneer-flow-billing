@@ -21,17 +21,17 @@ class Config:
     """Centralized Application Configuration Class."""
     
     # System Metadata
-    APP_NAME = _get_env('APP_NAME', 'Pioneer Flow Billing')
-    APP_VERSION = _get_env('APP_VERSION', '1.0.0')
-    APP_ENV = _get_env('APP_ENV', 'development')
+    APP_NAME = _get_env('APP_NAME', 'Pioneer Flow Billing ERP')
+    APP_VERSION = _get_env('APP_VERSION', '2.0.0')
+    APP_ENV = _get_env('APP_ENV', 'production')
     
-    # Active Data Provider (Supported: 'excel' | Future: 'tally', 'postgres', 'api')
-    DATA_PROVIDER = _get_env('DATA_PROVIDER', 'excel').lower()
+    # Active Data Provider (Default: 'tally' | Fallback: 'excel')
+    DATA_PROVIDER = _get_env('DATA_PROVIDER', 'tally').lower()
     
     # Company Profile & Branding Defaults
-    COMPANY_NAME = _get_env('COMPANY_NAME', 'Pioneer Flow Billing ERP')
-    COMPANY_SUBTITLE = _get_env('COMPANY_SUBTITLE', 'Mechanical Parts Inventory Management & Automated Billing Engine')
-    COMPANY_FOOTER = _get_env('COMPANY_FOOTER', 'Pioneer Automation Corp - Official Commercial Invoice')
+    COMPANY_NAME = _get_env('COMPANY_NAME', 'Pioneer Automation')
+    COMPANY_SUBTITLE = _get_env('COMPANY_SUBTITLE', 'Mechanical & Industrial Billing Solutions')
+    COMPANY_FOOTER = _get_env('COMPANY_FOOTER', 'Thank you for your business! | Pioneer Automation Corp')
     
     # Business Operational Defaults
     DEFAULT_GST_RATE = float(_get_env('DEFAULT_GST_RATE', '18.0'))
@@ -40,15 +40,15 @@ class Config:
     DEFAULT_UNIT = _get_env('DEFAULT_UNIT', 'PCS')
     
     # Directory & File Storage Paths
-    DATABASE_DIR = os.path.abspath(os.path.join(BASE_DIR, 'instance'))
-    DATABASE_PATH = os.path.abspath(os.path.join(DATABASE_DIR, _get_env('DATABASE_PATH', 'pioneer_flow.db')))
+    DATABASE_DIR = os.path.abspath(os.path.join(BASE_DIR, 'instance', 'db'))
+    DATABASE_PATH = os.path.abspath(os.path.join(DATABASE_DIR, 'database.db'))
     SCHEMA_PATH = os.path.abspath(os.path.join(BASE_DIR, 'app', 'database', 'schema.sql'))
     
     EXPORTS_DIR = os.path.abspath(os.path.join(BASE_DIR, _get_env('EXPORTS_DIR', 'exports')))
     UPLOADS_DIR = os.path.abspath(os.path.join(BASE_DIR, _get_env('UPLOADS_DIR', 'uploads')))
     LOGS_DIR = os.path.abspath(os.path.join(BASE_DIR, _get_env('LOGS_DIR', 'logs')))
     
-    # Reference Source Spreadsheet Locations
+    # Reference Source Spreadsheet Locations (Legacy Import Support)
     STOCK_SOURCE_PATH = os.path.abspath(os.path.join(BASE_DIR, _get_env('STOCK_EXCEL_PATH', 'group order status.xlsx')))
     COST_SOURCE_PATH = os.path.abspath(os.path.join(BASE_DIR, _get_env('COST_EXCEL_PATH', 'cost_data.xlsx')))
     
