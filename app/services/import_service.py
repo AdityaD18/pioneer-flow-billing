@@ -5,6 +5,14 @@ import sqlite3
 from datetime import datetime
 from app.models.database import get_db_connection, execute_db, query_db
 from app.services.excel_header_detector import ExcelHeaderDetector
+from app.core.config import Config
+from app.core.constants import (
+    EXCEL_STOCK_SHEET_NAME, EXCEL_COST_SHEET_NAME,
+    ITEM_CODE_SYNONYMS, CLOSING_STOCK_SYNONYMS, PURC_PENDING_SYNONYMS,
+    SALE_DUE_SYNONYMS, NETT_AVAILABLE_SYNONYMS, REORDER_LEVEL_SYNONYMS,
+    SHORTFALL_SYNONYMS, MIN_REORDER_SYNONYMS, ORDER_TO_PLACE_SYNONYMS,
+    PRICE_SYNONYMS, PACKING_QTY_SYNONYMS, SERIES_SYNONYMS
+)
 
 class ImportService:
     @staticmethod
@@ -13,9 +21,9 @@ class ImportService:
         return ExcelHeaderDetector.detect_headers_and_df(file_path, sheet_name, mandatory_synonym_groups)
 
     @classmethod
-    def import_inventory(cls, file_path, sheet_name='Stock Group Reorder Status', filename='uploaded_file.xlsx', imported_by=None):
+    def import_inventory(cls, file_path, sheet_name=EXCEL_STOCK_SHEET_NAME, filename='uploaded_file.xlsx', imported_by=None):
         """Imports inventory quantities into the SQLite database with robust upserts and logging."""
-        item_groups = [['item code', 'part number', 'part no', 'partno', 'code', 'item_code', 'part_no']]
+        item_groups = [ITEM_CODE_SYNONYMS]
         try:
             df = cls.detect_headers_and_df(file_path, sheet_name, item_groups)
         except Exception as e:
@@ -39,8 +47,8 @@ class ImportService:
 
         find_col = ExcelHeaderDetector.find_matching_column
 
-        # Resolve columns
-        item_code_col = find_col(df.columns, ['item code', 'part number', 'part no', 'partno', 'code', 'item_code', 'part_no'])
+        # Resolve columns using centralized constants
+        item_code_col = find_col(df.columns, ITEM_CODE_SYNONYMS)
         if not item_code_col:
             return {
                 "status": "failed",
@@ -50,14 +58,14 @@ class ImportService:
                 "errors": ["Could not locate an Item Code / Part Number column in inventory sheet."]
             }
 
-        stock_col = find_col(df.columns, ['closing stock', 'current stock', 'closing stock (pcs)', 'closing stock(pcs)', 'available stock', 'current stock (pcs)', 'stock'])
-        purc_col = find_col(df.columns, ['purc orders pending', 'purchase orders pending', 'purc orders', 'purchase pending', 'pending purchase', 'incoming stock', 'pending orders'])
-        sales_col = find_col(df.columns, ['sale orders due', 'sales orders due', 'sale orders', 'sales due', 'due sales', 'outgoing stock', 'reserved stock'])
-        nett_col = find_col(df.columns, ['nett available', 'net available', 'nett qty', 'net qty', 'available qty'])
-        reorder_col = find_col(df.columns, ['re-order level', 'reorder level', 'reorder qty limit', 'reorder level (pcs)'])
-        shortfall_col = find_col(df.columns, ['short fall', 'shortfall', 'short qty', 'shortage'])
-        min_reorder_col = find_col(df.columns, ['min reorder qty', 'min reorder', 'minimum order qty', 'min reorder quantity'])
-        order_to_place_col = find_col(df.columns, ['order to be placed', 'placed order', 'order to place', 'to be placed', 'order to be placed (pcs)'])
+        stock_col = find_col(df.columns, CLOSING_STOCK_SYNONYMS)
+        purc_col = find_col(df.columns, PURC_PENDING_SYNONYMS)
+        sales_col = find_col(df.columns, SALE_DUE_SYNONYMS)
+        nett_col = find_col(df.columns, NETT_AVAILABLE_SYNONYMS)
+        reorder_col = find_col(df.columns, REORDER_LEVEL_SYNONYMS)
+        shortfall_col = find_col(df.columns, SHORTFALL_SYNONYMS)
+        min_reorder_col = find_col(df.columns, MIN_REORDER_SYNONYMS)
+        order_to_place_col = find_col(df.columns, ORDER_TO_PLACE_SYNONYMS)
 
         def parse_float_or_none(row, col_name):
             if not col_name:
@@ -131,7 +139,7 @@ class ImportService:
                     series = item_code.split('-')[0] if '-' in item_code else None
                     cur.execute(
                         "INSERT INTO PRODUCTS (part_number, part_name, series, make) VALUES (?, ?, ?, ?)",
-                        (item_code, item_code, series, 'WAGO')
+                        (item_code, item_code, series, Config.DEFAULT_MAKE)
                     )
                     product_id = cur.lastrowid
                 else:
@@ -216,7 +224,7 @@ class ImportService:
             file_stream = BytesIO(content)
             result = cls.import_inventory(
                 file_stream, 
-                sheet_name='Stock Group Reorder Status', 
+                sheet_name=EXCEL_STOCK_SHEET_NAME, 
                 filename='google_sheets.xlsx', 
                 imported_by=imported_by
             )
@@ -231,9 +239,9 @@ class ImportService:
             }
 
     @classmethod
-    def import_costs(cls, file_path, sheet_name='PRICE LIST', filename='uploaded_file.xlsx', imported_by=None):
+    def import_costs(cls, file_path, sheet_name=EXCEL_COST_SHEET_NAME, filename='uploaded_file.xlsx', imported_by=None):
         """Imports product cost prices into the SQLite database, managing is_current historical tags."""
-        item_groups = [['item code', 'part number', 'part no', 'partno', 'code', 'item_code', 'part_no']]
+        item_groups = [ITEM_CODE_SYNONYMS]
         try:
             df = cls.detect_headers_and_df(file_path, sheet_name, item_groups)
         except Exception as e:
@@ -253,14 +261,10 @@ class ImportService:
                     "errors": [f"Header detection failed for cost list: {str(ex)}"]
                 }
 
-        # Resolve columns
-        item_code_col = None
-        for c in df.columns:
-            c_lower = c.lower()
-            if any(syn in c_lower for syn in ['item code', 'part number', 'part no', 'partno', 'code', 'item_code', 'part_no']):
-                item_code_col = c
-                break
-        
+        find_col = ExcelHeaderDetector.find_matching_column
+
+        # Resolve columns using centralized constants
+        item_code_col = find_col(df.columns, ITEM_CODE_SYNONYMS)
         if not item_code_col:
             return {
                 "status": "failed",
@@ -270,16 +274,7 @@ class ImportService:
                 "errors": ["Could not locate an Item Code / Part Number column in price sheet."]
             }
         
-        price_col = None
-        for search_syns in [['decimal converted', 'converted rate'], ['price', 'rate', 'mrp', 'cost']]:
-            for c in df.columns:
-                c_lower = c.lower()
-                if any(syn in c_lower for syn in search_syns):
-                    price_col = c
-                    break
-            if price_col:
-                break
-
+        price_col = find_col(df.columns, PRICE_SYNONYMS)
         if not price_col:
             return {
                 "status": "failed",
@@ -289,19 +284,8 @@ class ImportService:
                 "errors": [f"Could not identify a price column in the sheet. Columns: {df.columns.tolist()}"]
             }
 
-        packing_col = None
-        for c in df.columns:
-            c_lower = c.lower()
-            if any(syn in c_lower for syn in ['packing', 'quantity pcs', 'pack qty', 'packing quantity']):
-                packing_col = c
-                break
-
-        series_col = None
-        for c in df.columns:
-            c_lower = c.lower()
-            if any(syn in c_lower for syn in ['series', 'group', 'category']):
-                series_col = c
-                break
+        packing_col = find_col(df.columns, PACKING_QTY_SYNONYMS)
+        series_col = find_col(df.columns, SERIES_SYNONYMS)
 
         total_records = len(df)
         successful_records = 0
@@ -353,7 +337,7 @@ class ImportService:
                 if prod is None:
                     cur.execute(
                         "INSERT INTO PRODUCTS (part_number, part_name, series, make, packing_quantity) VALUES (?, ?, ?, ?, ?)",
-                        (item_code, item_code, series_val, 'WAGO', packing_qty)
+                        (item_code, item_code, series_val, Config.DEFAULT_MAKE, packing_qty)
                     )
                     product_id = cur.lastrowid
                 else:

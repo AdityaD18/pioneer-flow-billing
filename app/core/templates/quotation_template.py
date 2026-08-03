@@ -1,3 +1,5 @@
+from app.core.config import Config
+
 def generate_quotation_html(quotation_data):
     """Generates print-ready HTML for Quotation documents."""
     q = quotation_data
@@ -109,8 +111,8 @@ def generate_quotation_html(quotation_data):
         <table class="header-table">
             <tr>
                 <td>
-                    <div class="company-name">PIONEER AUTOMATION</div>
-                    <div style="color: #64748B; font-size: 9pt;">Mechanical & Industrial Billing Solutions</div>
+                    <div class="company-name">{Config.COMPANY_NAME}</div>
+                    <div style="color: #64748B; font-size: 9pt;">{Config.COMPANY_SUBTITLE}</div>
                 </td>
                 <td style="text-align: right;">
                     <div class="doc-title">QUOTATION</div>
@@ -126,7 +128,7 @@ def generate_quotation_html(quotation_data):
                     <strong style="color: #B45309;">PREPARED FOR:</strong><br>
                     <strong>{q['customer_name_snapshot']}</strong><br>
                     GSTIN: {q['customer_gst_snapshot'] or 'N/A'}<br>
-                    Terms: {q['customer_terms_snapshot'] or 'Net 30 Days'}
+                    Terms: {q['customer_terms_snapshot'] or Config.DEFAULT_PAYMENT_TERMS}
                 </td>
                 <td width="50%">
                     <strong style="color: #B45309;">VALIDITY & TERMS:</strong><br>
@@ -170,7 +172,7 @@ def generate_quotation_html(quotation_data):
         <div style="clear: both;"></div>
         
         <div class="footer">
-            Thank you for considering Pioneer Automation! | Commercial Proposal<br>
+            Thank you for considering {Config.COMPANY_NAME}! | Commercial Proposal<br>
             This is a computer generated quotation. Prices are subject to final confirmation.
         </div>
     </body>

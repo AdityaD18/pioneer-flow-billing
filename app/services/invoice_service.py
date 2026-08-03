@@ -1,6 +1,7 @@
 import sqlite3
 from datetime import datetime
 from app.models.database import get_db, query_db, execute_db
+from app.core.constants import INVOICE_SEQ_PREFIX, DEFAULT_START_SEQ
 
 class InvoiceService:
     @classmethod
@@ -39,7 +40,7 @@ class InvoiceService:
                 (current_year,)
             )
             latest = cur.fetchone()
-            next_seq = 1001 if latest is None else latest['seq_number'] + 1
+            next_seq = DEFAULT_START_SEQ if latest is None else latest['seq_number'] + 1
             
             # 2. Insert sequence tracking record to claim it
             cur.execute(
@@ -48,7 +49,7 @@ class InvoiceService:
             )
             
             # Format sequence number: INV-YYYY-XXXXX
-            invoice_number = f"INV-{current_year}-{next_seq:05d}"
+            invoice_number = f"{INVOICE_SEQ_PREFIX}-{current_year}-{next_seq:05d}"
             
             # 3. Create invoice referencing the order
             cur.execute(

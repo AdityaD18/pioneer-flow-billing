@@ -3,6 +3,7 @@ from datetime import datetime
 from app.models.database import get_db, query_db, get_db_connection
 from app.services.customer_service import CustomerService
 from app.services.order_service import OrderService
+from app.core.constants import QUOTATION_SEQ_PREFIX, DEFAULT_START_SEQ
 
 class QuotationService:
     @classmethod
@@ -61,7 +62,7 @@ class QuotationService:
                 (current_year,)
             )
             latest = cur.fetchone()
-            next_seq = 1001 if latest is None else latest['seq_number'] + 1
+            next_seq = DEFAULT_START_SEQ if latest is None else latest['seq_number'] + 1
             
             # 2. Insert sequence tracking record to claim it
             cur.execute(
@@ -70,7 +71,7 @@ class QuotationService:
             )
             
             # Format sequence number: QTN-YYYY-XXXXX
-            quotation_number = f"QTN-{current_year}-{next_seq:05d}"
+            quotation_number = f"{QUOTATION_SEQ_PREFIX}-{current_year}-{next_seq:05d}"
             
             # 3. Create quotation
             cur.execute(

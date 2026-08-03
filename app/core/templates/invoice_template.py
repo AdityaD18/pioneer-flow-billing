@@ -1,3 +1,5 @@
+from app.core.config import Config
+
 def generate_invoice_html(invoice_data):
     """Generates print-ready HTML for Invoice documents."""
     inv = invoice_data
@@ -110,8 +112,8 @@ def generate_invoice_html(invoice_data):
         <table class="header-table">
             <tr>
                 <td>
-                    <div class="company-name">PIONEER AUTOMATION</div>
-                    <div style="color: #64748B; font-size: 9pt;">Mechanical & Industrial Billing Solutions</div>
+                    <div class="company-name">{Config.COMPANY_NAME}</div>
+                    <div style="color: #64748B; font-size: 9pt;">{Config.COMPANY_SUBTITLE}</div>
                 </td>
                 <td style="text-align: right;">
                     <div class="doc-title">TAX INVOICE</div>
@@ -127,7 +129,7 @@ def generate_invoice_html(invoice_data):
                     <strong style="color: #0284C7;">BILLED TO:</strong><br>
                     <strong>{order['customer_name_snapshot']}</strong><br>
                     GSTIN: {order['customer_gst_snapshot'] or 'N/A'}<br>
-                    Terms: {order['customer_terms_snapshot'] or 'Net 30 Days'}
+                    Terms: {order['customer_terms_snapshot'] or Config.DEFAULT_PAYMENT_TERMS}
                 </td>
                 <td width="50%">
                     <strong style="color: #0284C7;">ORDER DETAILS:</strong><br>
@@ -171,7 +173,7 @@ def generate_invoice_html(invoice_data):
         <div style="clear: both;"></div>
         
         <div class="footer">
-            Thank you for your business! | Pioneer Automation Corp<br>
+            {Config.COMPANY_FOOTER}<br>
             This is a computer generated invoice and does not require physical signature.
         </div>
     </body>

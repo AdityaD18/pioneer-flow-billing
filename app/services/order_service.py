@@ -1,5 +1,6 @@
 from app.models.database import query_db, execute_db, get_db
 from app.services.customer_service import CustomerService
+from app.core.config import Config
 from datetime import datetime
 
 class OrderService:
@@ -14,9 +15,9 @@ class OrderService:
         """Helper to get default GST rate from settings."""
         settings = OrderService.get_settings()
         try:
-            return float(settings.get('gst_rate', 18.0))
+            return float(settings.get('gst_rate', Config.DEFAULT_GST_RATE))
         except ValueError:
-            return 18.0
+            return Config.DEFAULT_GST_RATE
 
     @classmethod
     def calculate_order(cls, customer_data, items_data):
@@ -152,8 +153,6 @@ class OrderService:
             customer_id = cust['id']
         else:
             customer_id = cust['id']
-            # Optionally update fields if user provided different inline values?
-            # Normally we just snapshot the provided inline details for this order.
         
         # 2. Perform Calculations
         calc = cls.calculate_order(cust, items_input)
@@ -175,13 +174,12 @@ class OrderService:
                 (
                     temp_order_num, customer_id, customer_name,
                     gst_number or cust['gst_number'], payment_terms or cust['payment_terms'],
-                    discount_percentage, calc['subtotal'], 0.0, # discount is applied per-item
+                    discount_percentage, calc['subtotal'], 0.0,
                     calc['gst_amount'], calc['grand_total'], calc['gst_rate']
                 )
             )
             order_id = cur.lastrowid
             
-            # Update order number with auto-increment ID to prevent duplicate collisions
             order_number = f"ORD-{datetime.now().year}-{order_id:05d}"
             cur.execute("UPDATE ORDERS SET order_number = ? WHERE id = ?", (order_number, order_id))
             
@@ -206,7 +204,7 @@ class OrderService:
             raise e
         finally:
             cur.close()
-            
+
     @classmethod
     def get_order_by_id(cls, order_id):
         """Retrieves order with associated items."""

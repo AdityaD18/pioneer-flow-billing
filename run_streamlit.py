@@ -1,9 +1,10 @@
 import os
 import streamlit as st
+from app.core.config import Config
 
 # Page Configuration
 st.set_page_config(
-    page_title="Pioneer Flow Billing - Mechanical ERP",
+    page_title=f"{Config.APP_NAME} - Mechanical ERP",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -26,13 +27,13 @@ init_db()
 inject_custom_css()
 
 # Render Application Header Banner
-render_html("""
+render_html(f"""
 <div class="header-banner">
     <div class="header-title">
-        <i class="fa-solid fa-bolt"></i> Pioneer Flow Billing ERP
+        <i class="fa-solid fa-bolt"></i> {Config.APP_NAME}
     </div>
     <div class="header-subtitle">
-        Mechanical Parts Inventory Management, Automated Billing & Pricing Engine
+        {Config.COMPANY_SUBTITLE}
     </div>
 </div>
 """)
