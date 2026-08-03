@@ -2,6 +2,9 @@ import os
 from typing import List, Optional, Dict, Any
 from app.providers.base_provider import BaseDataProvider
 from app.providers.connector_client import ConnectorClient
+from app.providers.mappers import (
+    StockMapper, CustomerMapper, LedgerMapper, CompanyMapper
+)
 from app.models.domain import (
     StockItem, StockGroup, Customer, Ledger,
     PurchaseOrder, SalesOrder, Company
@@ -18,7 +21,7 @@ from app.core.config import Config
 
 class TallyDataProvider(BaseDataProvider):
     """
-    Tally Data Provider communicating exclusively via ConnectorClient.
+    Tally Data Provider communicating exclusively via ConnectorClient & Mappers.
     Converts Connector REST JSON payloads into ERP canonical domain models.
     """
 
@@ -26,40 +29,15 @@ class TallyDataProvider(BaseDataProvider):
         self.client = client or ConnectorClient()
 
     def get_stock_items(self, search_kw: Optional[str] = None, series: Optional[str] = None) -> List[StockItem]:
-        """Retrieves stock items via ConnectorClient and converts to StockItem models."""
+        """Retrieves stock items via ConnectorClient and converts to StockItem domain models using StockMapper."""
         json_data = self.client.get_stock()
-        items = []
-
         if json_data and "items" in json_data:
-            for item in json_data["items"]:
-                p_num = item.get("part_number") or item.get("name", "")
-                p_series = item.get("parent_group") or "General"
-                
-                # Apply filters
-                if search_kw:
-                    skw = search_kw.lower()
-                    if skw not in p_num.lower() and skw not in item.get("name", "").lower():
-                        continue
-                if series and series != "All Series":
-                    if p_series != series and f"Series {series}" != series:
-                        continue
-
-                items.append(StockItem(
-                    product_id=item.get("guid") or hash(p_num),
-                    part_number=p_num,
-                    series=p_series,
-                    make=Config.DEFAULT_MAKE,
-                    packing_quantity=100,
-                    current_stock=float(item.get("closing_balance", 0.0)),
-                    cost_price_100=float(item.get("closing_rate", 0.0)) * 100.0,
-                    rate_per_unit=float(item.get("closing_rate", 0.0))
-                ))
-            return items
+            return StockMapper.to_domain_list(json_data["items"], search_kw=search_kw, series=series)
 
         # Fallback to local DB repository if Connector API is offline
         raw_list = ProductRepository.get_catalog(search_kw=search_kw, series=series)
-        for r in raw_list:
-            items.append(StockItem(
+        return [
+            StockItem(
                 product_id=r['product_id'],
                 part_number=r['Part Number'],
                 series=r['Series'],
@@ -68,40 +46,23 @@ class TallyDataProvider(BaseDataProvider):
                 current_stock=r['Current Stock (PCS)'],
                 cost_price_100=r['Cost / 100 Pcs (INR)'],
                 rate_per_unit=r['Rate / Pc (INR)']
-            ))
-        return items
+            ) for r in raw_list
+        ]
 
     def get_stock_groups(self) -> List[StockGroup]:
-        """Retrieves stock groups via ConnectorClient."""
+        """Retrieves stock groups via ConnectorClient and maps via StockMapper."""
         json_data = self.client.get_stock_groups()
         if json_data and isinstance(json_data, list):
-            return [
-                StockGroup(
-                    name=g.get("name"),
-                    series_code=g.get("series_code") or g.get("name", "").split()[0]
-                ) for g in json_data
-            ]
+            return [StockMapper.group_to_domain(g) for g in json_data]
 
         series_codes = ProductRepository.get_distinct_series()
         return [StockGroup(name=f"Series {s}", series_code=s) for s in series_codes]
 
     def get_customers(self, search_query: Optional[str] = None) -> List[Customer]:
-        """Retrieves customer ledgers via ConnectorClient."""
+        """Retrieves customer ledgers via ConnectorClient and maps via CustomerMapper."""
         json_data = self.client.get_customers()
         if json_data and isinstance(json_data, list):
-            customers = []
-            for idx, c in enumerate(json_data):
-                c_name = c.get("name", "")
-                if search_query and search_query.lower() not in c_name.lower():
-                    continue
-                customers.append(Customer(
-                    id=idx + 1,
-                    name=c_name,
-                    discount_percentage=0.0,
-                    gst_number=c.get("gstin") or "",
-                    payment_terms="Net 30 Days"
-                ))
-            return customers
+            return CustomerMapper.to_domain_list(json_data, search_query=search_query)
 
         raw_custs = CustomerRepository.get_all(search_query=search_query)
         return [
@@ -117,21 +78,10 @@ class TallyDataProvider(BaseDataProvider):
         ]
 
     def get_ledgers(self) -> List[Ledger]:
-        """Retrieves ledgers via ConnectorClient."""
+        """Retrieves ledgers via ConnectorClient and maps via LedgerMapper."""
         json_data = self.client.get_ledgers()
         if json_data and "ledgers" in json_data:
-            ledgers = []
-            for idx, l in enumerate(json_data["ledgers"]):
-                ledgers.append(Ledger(
-                    id=idx + 1,
-                    name=l.get("name"),
-                    reference_number=l.get("guid") or f"LEDG-{idx+1:04d}",
-                    customer_name=l.get("name"),
-                    date=l.get("updated_at", "")[:10],
-                    grand_total=float(l.get("closing_balance", 0.0)),
-                    type=l.get("ledger_type", "General").title()
-                ))
-            return ledgers
+            return LedgerMapper.to_domain_list(json_data["ledgers"])
 
         invoices = InvoiceRepository.get_all()
         quotations = QuotationRepository.get_all()
@@ -162,21 +112,10 @@ class TallyDataProvider(BaseDataProvider):
         return InvoiceRepository.get_all()
 
     def get_purchase_orders(self) -> List[PurchaseOrder]:
-        """Retrieves purchase orders pending via ConnectorClient."""
+        """Retrieves purchase orders pending via ConnectorClient & StockMapper."""
         json_data = self.client.get_stock()
         if json_data and "items" in json_data:
-            pos = []
-            for item in json_data["items"]:
-                purc_due = float(item.get("purchase_pending", 0.0))
-                if purc_due > 0:
-                    pos.append(PurchaseOrder(
-                        part_number=item.get("part_number"),
-                        make=Config.DEFAULT_MAKE,
-                        purc_orders_pending=purc_due,
-                        current_stock=float(item.get("closing_balance", 0.0)),
-                        nett_available=float(item.get("nett_available", 0.0))
-                    ))
-            return pos
+            return StockMapper.to_purchase_order_list(json_data["items"])
 
         stock_sheet = InventoryRepository.get_stock_sheet()
         pos = []
@@ -192,21 +131,10 @@ class TallyDataProvider(BaseDataProvider):
         return pos
 
     def get_sales_orders(self) -> List[SalesOrder]:
-        """Retrieves sales orders due via ConnectorClient."""
+        """Retrieves sales orders due via ConnectorClient & StockMapper."""
         json_data = self.client.get_stock()
         if json_data and "items" in json_data:
-            sos = []
-            for item in json_data["items"]:
-                sale_due = float(item.get("sales_due", 0.0))
-                if sale_due > 0:
-                    sos.append(SalesOrder(
-                        part_number=item.get("part_number"),
-                        make=Config.DEFAULT_MAKE,
-                        sales_orders_due=sale_due,
-                        current_stock=float(item.get("closing_balance", 0.0)),
-                        nett_available=float(item.get("nett_available", 0.0))
-                    ))
-            return sos
+            return StockMapper.to_sales_order_list(json_data["items"])
 
         stock_sheet = InventoryRepository.get_stock_sheet()
         sos = []
@@ -222,45 +150,18 @@ class TallyDataProvider(BaseDataProvider):
         return sos
 
     def get_inventory(self, search_query: Optional[str] = None, only_reorder: bool = False) -> List[dict]:
-        """Retrieves inventory status sheet via ConnectorClient."""
+        """Retrieves inventory status sheet via ConnectorClient & StockMapper."""
         json_data = self.client.get_inventory()
         if json_data and "items" in json_data:
-            inventory = []
-            for item in json_data["items"]:
-                p_num = item.get("part_number") or item.get("name", "")
-                if search_query and search_query.lower() not in p_num.lower():
-                    continue
-
-                shortfall = float(item.get("shortfall", 0.0))
-                if only_reorder and shortfall <= 0:
-                    continue
-
-                inventory.append({
-                    "Part Number": p_num,
-                    "Make": Config.DEFAULT_MAKE,
-                    "Closing Stock": float(item.get("closing_balance", 0.0)),
-                    "Purc Orders Pending": float(item.get("purchase_pending", 0.0)),
-                    "Sale Orders Due": float(item.get("sales_due", 0.0)),
-                    "Nett Available": float(item.get("nett_available", 0.0)),
-                    "Reorder Level": float(item.get("reorder_level", 0.0)),
-                    "Shortfall": shortfall,
-                    "Order Placed Recommendation": shortfall
-                })
-            return inventory
+            return StockMapper.to_inventory_dict_list(json_data["items"], search_query=search_query, only_reorder=only_reorder)
 
         return InventoryRepository.get_stock_sheet(search_kw=search_query, only_reorder=only_reorder)
 
     def get_company_details(self) -> Company:
-        """Retrieves company details via ConnectorClient."""
+        """Retrieves company details via ConnectorClient & CompanyMapper."""
         json_data = self.client.get_company()
         if json_data:
-            return Company(
-                company_name=json_data.get("company_name", Config.COMPANY_NAME),
-                company_subtitle=Config.COMPANY_SUBTITLE,
-                company_footer=Config.COMPANY_FOOTER,
-                default_gst_rate=Config.DEFAULT_GST_RATE,
-                default_payment_terms=Config.DEFAULT_PAYMENT_TERMS
-            )
+            return CompanyMapper.to_domain(json_data)
 
         return Company(
             company_name=Config.COMPANY_NAME,
