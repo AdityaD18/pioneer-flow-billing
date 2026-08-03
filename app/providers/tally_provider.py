@@ -1,7 +1,7 @@
 import os
-import requests
 from typing import List, Optional, Dict, Any
 from app.providers.base_provider import BaseDataProvider
+from app.providers.connector_client import ConnectorClient
 from app.models.domain import (
     StockItem, StockGroup, Customer, Ledger,
     PurchaseOrder, SalesOrder, Company
@@ -15,31 +15,19 @@ from app.services.import_service import ImportService
 from app.services.invoice_service import InvoiceService
 from app.services.excel_export_service import ExcelExportService
 from app.core.config import Config
-from app.core.logger import app_logger
 
 class TallyDataProvider(BaseDataProvider):
     """
-    Tally Data Provider communicating exclusively with Pioneer Connector REST API.
+    Tally Data Provider communicating exclusively via ConnectorClient.
     Converts Connector REST JSON payloads into ERP canonical domain models.
     """
 
-    def __init__(self, connector_url: str = None):
-        self.connector_url = connector_url or os.environ.get("CONNECTOR_API_URL", "http://localhost:8000/api/v1")
-
-    def _get_api(self, endpoint: str) -> Optional[Any]:
-        """Communicates ONLY with Connector REST API. Returns JSON payload or None on failure."""
-        url = f"{self.connector_url}{endpoint}"
-        try:
-            resp = requests.get(url, timeout=0.3)
-            if resp.status_code == 200:
-                return resp.json()
-        except Exception:
-            app_logger.warning(f"Connector REST API unavailable at {url}. Falling back to local store.")
-        return None
+    def __init__(self, client: Optional[ConnectorClient] = None):
+        self.client = client or ConnectorClient()
 
     def get_stock_items(self, search_kw: Optional[str] = None, series: Optional[str] = None) -> List[StockItem]:
-        """Retrieves stock items from Connector REST API and converts to StockItem models."""
-        json_data = self._get_api("/stock")
+        """Retrieves stock items via ConnectorClient and converts to StockItem models."""
+        json_data = self.client.get_stock()
         items = []
 
         if json_data and "items" in json_data:
@@ -84,8 +72,8 @@ class TallyDataProvider(BaseDataProvider):
         return items
 
     def get_stock_groups(self) -> List[StockGroup]:
-        """Retrieves stock groups from Connector REST API."""
-        json_data = self._get_api("/stock/groups")
+        """Retrieves stock groups via ConnectorClient."""
+        json_data = self.client.get_stock_groups()
         if json_data and isinstance(json_data, list):
             return [
                 StockGroup(
@@ -98,8 +86,8 @@ class TallyDataProvider(BaseDataProvider):
         return [StockGroup(name=f"Series {s}", series_code=s) for s in series_codes]
 
     def get_customers(self, search_query: Optional[str] = None) -> List[Customer]:
-        """Retrieves customer ledgers from Connector REST API."""
-        json_data = self._get_api("/customers")
+        """Retrieves customer ledgers via ConnectorClient."""
+        json_data = self.client.get_customers()
         if json_data and isinstance(json_data, list):
             customers = []
             for idx, c in enumerate(json_data):
@@ -129,8 +117,8 @@ class TallyDataProvider(BaseDataProvider):
         ]
 
     def get_ledgers(self) -> List[Ledger]:
-        """Retrieves ledgers from Connector REST API."""
-        json_data = self._get_api("/ledgers")
+        """Retrieves ledgers via ConnectorClient."""
+        json_data = self.client.get_ledgers()
         if json_data and "ledgers" in json_data:
             ledgers = []
             for idx, l in enumerate(json_data["ledgers"]):
@@ -174,8 +162,8 @@ class TallyDataProvider(BaseDataProvider):
         return InvoiceRepository.get_all()
 
     def get_purchase_orders(self) -> List[PurchaseOrder]:
-        """Retrieves purchase orders pending."""
-        json_data = self._get_api("/stock")
+        """Retrieves purchase orders pending via ConnectorClient."""
+        json_data = self.client.get_stock()
         if json_data and "items" in json_data:
             pos = []
             for item in json_data["items"]:
@@ -204,8 +192,8 @@ class TallyDataProvider(BaseDataProvider):
         return pos
 
     def get_sales_orders(self) -> List[SalesOrder]:
-        """Retrieves sales orders due."""
-        json_data = self._get_api("/stock")
+        """Retrieves sales orders due via ConnectorClient."""
+        json_data = self.client.get_stock()
         if json_data and "items" in json_data:
             sos = []
             for item in json_data["items"]:
@@ -234,8 +222,8 @@ class TallyDataProvider(BaseDataProvider):
         return sos
 
     def get_inventory(self, search_query: Optional[str] = None, only_reorder: bool = False) -> List[dict]:
-        """Retrieves inventory status sheet."""
-        json_data = self._get_api("/stock")
+        """Retrieves inventory status sheet via ConnectorClient."""
+        json_data = self.client.get_inventory()
         if json_data and "items" in json_data:
             inventory = []
             for item in json_data["items"]:
@@ -263,8 +251,8 @@ class TallyDataProvider(BaseDataProvider):
         return InventoryRepository.get_stock_sheet(search_kw=search_query, only_reorder=only_reorder)
 
     def get_company_details(self) -> Company:
-        """Retrieves company details from Connector REST API."""
-        json_data = self._get_api("/company")
+        """Retrieves company details via ConnectorClient."""
+        json_data = self.client.get_company()
         if json_data:
             return Company(
                 company_name=json_data.get("company_name", Config.COMPANY_NAME),
@@ -283,16 +271,13 @@ class TallyDataProvider(BaseDataProvider):
         )
 
     def save_invoice(self, order_id: int, invoice_date: Optional[str] = None) -> int:
-        """Generates invoice for order."""
         return InvoiceService.generate_invoice_for_order(order_id, invoice_date=invoice_date)
 
     def update_inventory(self, product_id: int, new_stock_qty: float) -> bool:
-        """Updates stock quantity."""
         InventoryRepository.update_stock(product_id, new_stock_qty)
         return True
 
     def search_item(self, query: str) -> List[StockItem]:
-        """Searches product items by code, name, or make."""
         return self.get_stock_items(search_kw=query)
 
     def import_inventory(self, file_path, sheet_name=None, filename='uploaded_file.xlsx', imported_by=None):
