@@ -71,7 +71,7 @@ class StockMapper:
                 sos.append(SalesOrder(
                     part_number=raw.get("part_number") or raw.get("name", ""),
                     make=Config.DEFAULT_MAKE,
-                    sales_orders_due=sale_due,
+                    sale_orders_due=sale_due,
                     current_stock=float(raw.get("closing_balance", 0.0)),
                     nett_available=float(raw.get("nett_available", 0.0))
                 ))
@@ -89,6 +89,7 @@ class StockMapper:
             if only_reorder and shortfall <= 0:
                 continue
 
+            reorder_lvl = float(raw.get("reorder_level", 0.0))
             inventory.append({
                 "Part Number": p_num,
                 "Make": Config.DEFAULT_MAKE,
@@ -96,8 +97,10 @@ class StockMapper:
                 "Purc Orders Pending": float(raw.get("purchase_pending", 0.0)),
                 "Sale Orders Due": float(raw.get("sales_due", 0.0)),
                 "Nett Available": float(raw.get("nett_available", 0.0)),
-                "Reorder Level": float(raw.get("reorder_level", 0.0)),
-                "Shortfall": shortfall,
-                "Order Placed Recommendation": shortfall
+                "Min Reorder Qty": reorder_lvl,
+                "Reorder Level": reorder_lvl,
+                "Short Fall": shortfall,
+                "Order To Be Placed": shortfall,
+                "Last Updated": raw.get("updated_at", "")[:10] or "2026-01-01"
             })
         return inventory

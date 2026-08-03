@@ -26,7 +26,7 @@ class TallyDataProvider(BaseDataProvider):
     """
 
     def __init__(self, client: Optional[ConnectorClient] = None):
-        self.client = client or ConnectorClient()
+        self.client = client or ConnectorClient(timeout=0.5, max_retries=1)
 
     def get_stock_items(self, search_kw: Optional[str] = None, series: Optional[str] = None) -> List[StockItem]:
         """Retrieves stock items via ConnectorClient and converts to StockItem domain models using StockMapper."""
@@ -143,7 +143,7 @@ class TallyDataProvider(BaseDataProvider):
                 sos.append(SalesOrder(
                     part_number=r['Part Number'],
                     make=r['Make'],
-                    sales_orders_due=r['Sale Orders Due'],
+                    sale_orders_due=r['Sale Orders Due'],
                     current_stock=r['Closing Stock'],
                     nett_available=r['Nett Available']
                 ))
