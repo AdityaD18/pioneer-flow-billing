@@ -7,8 +7,9 @@ from app.core.logger import app_logger
 class ConnectorClient:
     """
     Dedicated HTTP Client managing communication between Pioneer Flow Billing ERP
-    and Pioneer Connector microservice REST API.
-    Centralizes connection management, timeouts, retries, authentication, and error handling.
+    and Pioneer Connector microservice / Cloud Backend REST API.
+    Centralizes connection management, OAuth Bearer tokens, Device IDs, protocol headers,
+    timeouts, retries, and error handling.
     """
 
     def __init__(self, base_url: Optional[str] = None, timeout: float = 3.0, max_retries: int = 2):
@@ -16,11 +17,23 @@ class ConnectorClient:
         self.timeout = timeout
         self.max_retries = max_retries
         self.session = requests.Session()
-        # Pre-configure headers (and token auth if configured)
-        self.session.headers.update({
-            "User-Agent": "PioneerFlowBilling-ERP/2.0",
-            "Accept": "application/json"
-        })
+        
+        # Security & Protocol Headers
+        api_token = os.environ.get("CONNECTOR_API_KEY") or os.environ.get("CONNECTOR_ACCESS_TOKEN") or ""
+        device_id = os.environ.get("CONNECTOR_DEVICE_ID") or ""
+        
+        headers = {
+            "User-Agent": "PioneerFlowBilling-ERP/2.0.1",
+            "Accept": "application/json",
+            "X-Pioneer-Version": "2.0.1",
+            "X-Protocol-Version": "1.0"
+        }
+        if api_token:
+            headers["Authorization"] = f"Bearer {api_token}"
+        if device_id:
+            headers["X-Device-ID"] = device_id
+            
+        self.session.headers.update(headers)
 
     def _request(self, method: str, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Optional[Any]:
         """
@@ -51,6 +64,18 @@ class ConnectorClient:
     def get_health(self) -> Optional[Dict[str, Any]]:
         """Fetch connector and Tally connection health status."""
         return self._request("GET", "/health")
+
+    def get_version(self) -> Optional[Dict[str, Any]]:
+        """Fetch connector protocol version and build info."""
+        return self._request("GET", "/version")
+
+    def get_capabilities(self) -> Optional[Dict[str, Any]]:
+        """Fetch connector capability flags."""
+        return self._request("GET", "/capabilities")
+
+    def get_identity(self) -> Optional[Dict[str, Any]]:
+        """Fetch unique connector identity and hardware machine details."""
+        return self._request("GET", "/identity")
 
     def get_company(self) -> Optional[Dict[str, Any]]:
         """Fetch active Tally company metadata."""

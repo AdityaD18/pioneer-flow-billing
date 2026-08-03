@@ -54,12 +54,61 @@ def render_sync_dashboard_tab():
     st.markdown("---")
 
     # Fetch live health, company, stock, ledgers, and sync status from Connector REST API
+    # ==========================================================
+    # Fetch Health
+    # ==========================================================
     health = client.get_health() or {}
     tally = health.get("tally_health", {})
-    sync_status = client.get_sync_status() or {}
-    company = client.get_company() or {}
-    stock_data = client.get_stock() or {}
-    ledger_data = client.get_ledgers() or {}
+
+    # ==========================================================
+    # DEBUG (TEMPORARY)
+    # ==========================================================
+    st.subheader("🔍 Connector Debug")
+
+    st.write("Base URL")
+    st.code(client.base_url)
+
+    st.write("Raw Health Response")
+    st.json(health)
+
+    st.write("Parsed Tally Health")
+    st.json(tally)
+
+    st.write("Connected")
+    st.write(tally.get("connected"))
+
+    st.write("Company")
+    st.write(tally.get("company_name"))
+
+    st.write("Version")
+    st.write(tally.get("tally_version"))
+
+    st.write("Latency")
+    st.write(tally.get("response_time_ms"))
+
+    # ==========================================================
+    # Only call the remaining APIs if health succeeded
+    # ==========================================================
+    if tally.get("connected", False):
+
+        sync_status = client.get_sync_status() or {}
+
+        company = client.get_company() or {}
+
+        stock_data = client.get_stock() or {}
+
+        ledger_data = client.get_ledgers() or {}
+
+    else:
+
+        sync_status = {}
+
+        company = {}
+
+        stock_data = {}
+
+        ledger_data = {}
+        
 
     # Connection & Status Detection
     is_online = tally.get("connected", False)
