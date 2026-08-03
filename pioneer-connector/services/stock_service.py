@@ -1,4 +1,3 @@
-import time
 from datetime import datetime
 from typing import List, Optional
 import requests
@@ -6,22 +5,25 @@ from config.settings import settings
 from tally.xml.xml_builder import TallyXMLBuilder
 from tally.parser.xml_parser import TallyXMLParser
 from tally.models.stock import TallyStockItem, TallyStockGroup
+from cache.sqlite_cache import ConnectorCacheDB
 
 class StockService:
-    """Service orchestrating Stock Item and Stock Group synchronization with TallyPrime."""
-
-    _cache_items: List[TallyStockItem] = []
-    _cache_groups: List[TallyStockGroup] = []
-    _last_sync_timestamp: Optional[str] = None
+    """
+    Service orchestrating Stock Item and Stock Group synchronization with TallyPrime
+    backed by SQLite cache for instant serving and offline resilience.
+    """
 
     @classmethod
     def sync_stock_items(cls, force_refresh: bool = False) -> List[TallyStockItem]:
         """
-        Downloads all stock items from Tally, converts XML to canonical JSON objects,
-        validates record counts, and updates internal cache.
+        Attempts to read from Tally. On success, validates & writes to SQLite cache.
+        If Tally is unavailable or returns errors, serves cached data from SQLite seamlessly.
         """
-        if cls._cache_items and not force_refresh:
-            return cls._cache_items
+        cached_items = ConnectorCacheDB.get_stock_items()
+
+        # If cached data exists and force_refresh is False, return cached instantly
+        if cached_items and not force_refresh:
+            return cached_items
 
         xml_request = TallyXMLBuilder.build_stock_item_export_request(company_name=settings.TALLY_COMPANY)
         url = f"http://{settings.TALLY_HOST}:{settings.TALLY_PORT}"
@@ -30,19 +32,21 @@ class StockService:
             resp = requests.post(url, data=xml_request, headers={"Content-Type": "text/xml"}, timeout=settings.TALLY_TIMEOUT)
             if resp.status_code == 200:
                 items = TallyXMLParser.parse_stock_items(resp.text)
-                cls._cache_items = items
-                cls._last_sync_timestamp = datetime.utcnow().isoformat() + "Z"
-                return items
+                if items:
+                    ConnectorCacheDB.save_stock_items(items)
+                    return items
         except Exception:
+            # Fall back to SQLite cache when Tally is offline
             pass
 
-        return cls._cache_items
+        return cached_items or ConnectorCacheDB.get_stock_items()
 
     @classmethod
     def sync_stock_groups(cls, force_refresh: bool = False) -> List[TallyStockGroup]:
-        """Downloads all stock groups from Tally."""
-        if cls._cache_groups and not force_refresh:
-            return cls._cache_groups
+        """Downloads stock groups from Tally, writes to SQLite cache, or serves cached."""
+        cached_groups = ConnectorCacheDB.get_stock_groups()
+        if cached_groups and not force_refresh:
+            return cached_groups
 
         xml_request = TallyXMLBuilder.build_export_request("List of Stock Groups", company_name=settings.TALLY_COMPANY)
         url = f"http://{settings.TALLY_HOST}:{settings.TALLY_PORT}"
@@ -51,16 +55,17 @@ class StockService:
             resp = requests.post(url, data=xml_request, headers={"Content-Type": "text/xml"}, timeout=settings.TALLY_TIMEOUT)
             if resp.status_code == 200:
                 groups = TallyXMLParser.parse_stock_groups(resp.text)
-                cls._cache_groups = groups
-                return groups
+                if groups:
+                    ConnectorCacheDB.save_stock_groups(groups)
+                    return groups
         except Exception:
             pass
 
-        return cls._cache_groups
+        return cached_groups or ConnectorCacheDB.get_stock_groups()
 
     @classmethod
     def get_stock_item_by_id(cls, item_id: str) -> Optional[TallyStockItem]:
-        """Looks up a stock item by part number or GUID."""
+        """Looks up a stock item by part number or GUID from cache."""
         items = cls.sync_stock_items()
         item_id_lower = item_id.lower()
         for item in items:
@@ -70,4 +75,7 @@ class StockService:
 
     @classmethod
     def get_last_sync_timestamp(cls) -> str:
-        return cls._last_sync_timestamp or datetime.utcnow().isoformat() + "Z"
+        meta = ConnectorCacheDB.get_last_sync("stock_items")
+        if meta and meta.get("last_sync_timestamp"):
+            return meta["last_sync_timestamp"]
+        return datetime.utcnow().isoformat() + "Z"
