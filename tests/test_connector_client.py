@@ -15,13 +15,26 @@ class TestConnectorClient(unittest.TestCase):
     def test_get_health_success(self, mock_request):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        mock_resp.json.return_value = {"status": "healthy", "tally_connected": True}
+        mock_resp.json.return_value = {
+            "service": "Pioneer Tally Connector",
+            "environment": "development",
+            "tally_health": {
+                "connected": True,
+                "company_name": "Pioneer Automation",
+                "tally_version": "TallyPrime 7.1",
+                "response_time_ms": 1.52,
+                "last_checked": "2026-08-03T10:38:28Z",
+                "endpoint": "http://127.0.0.1:9000",
+                "error_message": None
+            }
+        }
         mock_request.return_value = mock_resp
 
         result = self.client.get_health()
         self.assertIsNotNone(result)
-        self.assertEqual(result["status"], "healthy")
-        self.assertTrue(result["tally_connected"])
+        self.assertIn("tally_health", result)
+        self.assertTrue(result["tally_health"]["connected"])
+        self.assertEqual(result["tally_health"]["company_name"], "Pioneer Automation")
 
     @patch("requests.Session.request")
     def test_get_stock_success(self, mock_request):

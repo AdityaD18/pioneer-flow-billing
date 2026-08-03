@@ -15,11 +15,13 @@ def render_sync_dashboard_tab():
     with col_btn1:
         if st.button("🔌 Test Connection", use_container_width=True):
             with st.spinner("Probing Connector & Tally HTTP server..."):
-                health = client.get_health()
-                if health and health.get("status") in ("healthy", "success"):
-                    trigger_toast(f"Connection Successful! Latency: {health.get('response_time_ms', 0)} ms", icon="🟢")
+                h_resp = client.get_health() or {}
+                t_health = h_resp.get("tally_health", {})
+                if t_health.get("connected", False):
+                    trigger_toast(f"Connection Successful! Latency: {t_health.get('response_time_ms', 0):.2f} ms", icon="🟢")
                 else:
-                    st.error("🔴 Failed to reach Pioneer Connector microservice.")
+                    err_msg = t_health.get("error_message") or "Pioneer Connector microservice unreachable"
+                    st.error(f"🔴 Connection Failed: {err_msg}")
 
     with col_btn2:
         if st.button("⚡ Incremental Sync", use_container_width=True):
@@ -53,33 +55,35 @@ def render_sync_dashboard_tab():
 
     # Fetch live health, company, stock, ledgers, and sync status from Connector REST API
     health = client.get_health() or {}
+    tally = health.get("tally_health", {})
     sync_status = client.get_sync_status() or {}
     company = client.get_company() or {}
     stock_data = client.get_stock() or {}
     ledger_data = client.get_ledgers() or {}
 
+    # Connection & Status Detection
+    is_online = tally.get("connected", False)
+
     # Diagnostic Top Cards
     m1, m2, m3, m4 = st.columns(4)
 
-    is_online = health.get("status") in ("healthy", "success")
-    tally_conn = health.get("tally_connected", False)
-
     with m1:
-        status_str = "🟢 Online" if is_online and tally_conn else ("🟡 Syncing" if is_online else "🔴 Offline")
-        color = "green" if is_online and tally_conn else ("amber" if is_online else "red")
-        draw_metric_card("Connector Status", status_str, f"Tally: {'Active' if tally_conn else 'Disconnected'}", "fa-solid fa-server", color)
+        status_str = "🟢 Online" if is_online else "🔴 Offline"
+        color = "green" if is_online else "red"
+        sub_str = f"Tally: {'Connected' if is_online else 'Disconnected'}"
+        draw_metric_card("Connector Status", status_str, sub_str, "fa-solid fa-server", color)
 
     with m2:
-        comp_name = company.get("company_name", "N/A")
-        t_version = company.get("tally_version", health.get("tally_version", "N/A"))
+        comp_name = tally.get("company_name") or company.get("company_name", "N/A")
+        t_version = tally.get("tally_version") or company.get("tally_version", "TallyPrime 7.1")
         draw_metric_card("Active Company", comp_name, f"Build: {t_version}", "fa-solid fa-building", "blue")
 
     with m3:
-        latency = health.get("response_time_ms", 0.0)
-        draw_metric_card("Connection Latency", f"{latency:.1f} ms", "Tally XML Ping", "fa-solid fa-network-wired", "purple")
+        latency = tally.get("response_time_ms", 0.0)
+        draw_metric_card("Connection Latency", f"{latency:.2f} ms", "Tally HTTP Ping", "fa-solid fa-network-wired", "purple")
 
     with m4:
-        last_sync = sync_status.get("last_sync_timestamp", health.get("last_checked", "Never"))
+        last_sync = sync_status.get("last_sync_timestamp") or tally.get("last_checked", "Never")
         if last_sync and "T" in last_sync:
             last_sync = last_sync.replace("T", " ")[:19]
         draw_metric_card("Last Sync", last_sync, f"Type: {sync_status.get('sync_type', 'Full').title()}", "fa-solid fa-clock", "cyan")

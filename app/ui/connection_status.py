@@ -8,25 +8,18 @@ def render_connection_status():
 
     if provider_name == "tally":
         client = ConnectorClient(timeout=1.5, max_retries=1)
-        health = client.get_health()
+        health = client.get_health() or {}
+        tally = health.get("tally_health", {})
 
-        if health and health.get("status") in ("healthy", "success"):
-            if health.get("tally_connected", False):
-                company = health.get("company_name", "TallyPrime")
-                version = health.get("tally_version", "TallyPrime")
-                st.markdown(
-                    f'<div style="padding: 8px 14px; background: #DCFCE7; color: #15803D; border: 1px solid #86EFAC; border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; margin-bottom: 12px;">'
-                    f'<span style="font-size: 14px;">🟢 Connected</span> | <span style="font-weight: 400;">Company: <b>{company}</b> ({version})</span>'
-                    f'</div>',
-                    unsafe_allow_html=True
-                )
-            else:
-                st.markdown(
-                    f'<div style="padding: 8px 14px; background: #FEF3C7; color: #B45309; border: 1px solid #FCD34D; border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; margin-bottom: 12px;">'
-                    f'<span style="font-size: 14px;">🟡 Synchronizing</span> | <span style="font-weight: 400;">Pioneer Connector Active (Awaiting Tally XML)</span>'
-                    f'</div>',
-                    unsafe_allow_html=True
-                )
+        if tally.get("connected", False):
+            company = tally.get("company_name", "Pioneer Automation")
+            version = tally.get("tally_version", "TallyPrime 7.1")
+            st.markdown(
+                f'<div style="padding: 8px 14px; background: #DCFCE7; color: #15803D; border: 1px solid #86EFAC; border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; margin-bottom: 12px;">'
+                f'<span style="font-size: 14px;">🟢 Connected</span> | <span style="font-weight: 400;">Company: <b>{company}</b> ({version})</span>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
         else:
             st.markdown(
                 f'<div style="padding: 8px 14px; background: #FEE2E2; color: #B91C1C; border: 1px solid #FCA5A5; border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; margin-bottom: 12px;">'
