@@ -4,7 +4,7 @@ from app.services.customer_service import CustomerService
 from app.services.order_service import OrderService
 from app.services.invoice_service import InvoiceService
 from app.services.quotation_service import QuotationService
-from app.repositories.product_repository import ProductRepository
+from app.services.product_service import ProductService
 from app.ui.styles import render_html, draw_metric_card, trigger_toast
 from app.core.pdf_generator import generate_invoice_html, generate_quotation_html, generate_pdf_from_html
 
@@ -41,7 +41,7 @@ def render_billing_tab():
     # 2. Line Items Builder
     render_html('<div class="setting-section"><div class="setting-section-title"><i class="fa-solid fa-cart-flatbed"></i> Line Items</div></div>')
     
-    all_prods = ProductRepository.get_all_billing_products()
+    all_prods = ProductService.get_all_billing_products()
     prod_map = {f"{p['part_number']} - {p['part_name'] or ''}": p for p in all_prods}
     prod_names = ["-- Select Product --"] + list(prod_map.keys())
     

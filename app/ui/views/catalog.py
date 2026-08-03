@@ -1,6 +1,8 @@
 import pandas as pd
 import streamlit as st
 from app.providers import get_data_provider
+from app.services.inventory_service import InventoryService
+from app.services.product_service import ProductService
 from app.ui.styles import render_html, draw_metric_card, trigger_toast
 
 def render_catalog_tab():
@@ -46,13 +48,12 @@ def render_catalog_tab():
             
             # Check stock change
             if float(row['Current Stock (PCS)']) != float(orig['Current Stock (PCS)']):
-                provider.update_inventory(p_id, float(row['Current Stock (PCS)']))
+                InventoryService.update_product_stock(p_id, float(row['Current Stock (PCS)']))
                 updated_cnt += 1
                 
             # Check price change
             if float(row['Cost / 100 Pcs (INR)']) != float(orig['Cost / 100 Pcs (INR)']):
-                from app.repositories.product_repository import ProductRepository
-                ProductRepository.update_cost_price(p_id, float(row['Cost / 100 Pcs (INR)']))
+                ProductService.update_product_cost_price(p_id, float(row['Cost / 100 Pcs (INR)']))
                 updated_cnt += 1
                 
         if updated_cnt > 0:

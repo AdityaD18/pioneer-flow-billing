@@ -16,6 +16,11 @@ class OrderService:
         """Helper to get default GST rate from settings."""
         return OrderRepository.get_gst_rate()
 
+    @staticmethod
+    def update_gst_rate(new_rate):
+        """Updates the default GST rate configuration."""
+        OrderRepository.update_setting('gst_rate', new_rate)
+
     @classmethod
     def calculate_order(cls, customer_data, items_data):
         """

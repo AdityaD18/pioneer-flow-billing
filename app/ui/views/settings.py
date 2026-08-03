@@ -2,7 +2,7 @@ import os
 import streamlit as st
 import pandas as pd
 from app.providers import get_data_provider
-from app.repositories.order_repository import OrderRepository
+from app.services.order_service import OrderService
 from app.ui.styles import render_html, trigger_toast
 
 def render_settings_tab():
@@ -14,7 +14,7 @@ def render_settings_tab():
     # 1. Tax & Configuration Defaults
     render_html('<div class="setting-section"><div class="setting-section-title"><i class="fa-solid fa-gear"></i> Default System Configuration</div></div>')
     
-    gst_val = OrderRepository.get_gst_rate()
+    gst_val = OrderService.get_gst_rate()
     
     c_set1, c_set2 = st.columns([2, 1])
     with c_set1:
@@ -22,7 +22,7 @@ def render_settings_tab():
     with c_set2:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("💾 Update GST Configuration", use_container_width=True):
-            OrderRepository.update_setting('gst_rate', new_gst_val)
+            OrderService.update_gst_rate(new_gst_val)
             trigger_toast(f"GST Rate updated to {new_gst_val}%!", icon="⚙️")
             st.rerun()
 
