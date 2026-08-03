@@ -1,26 +1,28 @@
-"""
-Immutable Domain & System Constants for Pioneer Flow Billing ERP.
-"""
-
-# Numbering System Sequence Prefixes
+# Sequence Prefixes & Numbering Rules
 INVOICE_SEQ_PREFIX = "INV"
 QUOTATION_SEQ_PREFIX = "QTN"
 DEFAULT_START_SEQ = 1001
 
-# Excel Sheet Names & Column Synonym Definitions
-EXCEL_STOCK_SHEET_NAME = "Stock Group Reorder Status"
-EXCEL_COST_SHEET_NAME = "PRICE LIST"
+# Source Sheet Names & Column Synonym Definitions
+DEFAULT_STOCK_SHEET_NAME = "Stock Group Reorder Status"
+DEFAULT_COST_SHEET_NAME = "PRICE LIST"
 
-ITEM_CODE_SYNONYMS = ['item code', 'part number', 'part no', 'partno', 'code', 'item_code', 'part_no']
-CLOSING_STOCK_SYNONYMS = ['closing stock', 'current stock', 'closing stock (pcs)', 'closing stock(pcs)', 'available stock', 'current stock (pcs)', 'stock']
-PURC_PENDING_SYNONYMS = ['purc orders pending', 'purchase orders pending', 'purc orders', 'purchase pending', 'pending purchase', 'incoming stock', 'pending orders']
-SALE_DUE_SYNONYMS = ['sale orders due', 'sales orders due', 'sale orders', 'sales due', 'due sales', 'outgoing stock', 'reserved stock']
-NETT_AVAILABLE_SYNONYMS = ['nett available', 'net available', 'nett qty', 'net qty', 'available qty']
-REORDER_LEVEL_SYNONYMS = ['re-order level', 'reorder level', 'reorder qty limit', 'reorder level (pcs)']
-SHORTFALL_SYNONYMS = ['short fall', 'shortfall', 'short qty', 'shortage']
-MIN_REORDER_SYNONYMS = ['min reorder qty', 'min reorder', 'minimum order qty', 'min reorder quantity']
-ORDER_TO_PLACE_SYNONYMS = ['order to be placed', 'placed order', 'order to place', 'to be placed', 'order to be placed (pcs)']
+# Aliases for backward compatibility
+EXCEL_STOCK_SHEET_NAME = DEFAULT_STOCK_SHEET_NAME
+EXCEL_COST_SHEET_NAME = DEFAULT_COST_SHEET_NAME
 
-PRICE_SYNONYMS = ['decimal converted', 'converted rate', 'price', 'rate', 'mrp', 'cost']
-PACKING_QTY_SYNONYMS = ['packing', 'quantity pcs', 'pack qty', 'packing quantity']
-SERIES_SYNONYMS = ['series', 'group', 'category']
+# Master Synonym Mapping Arrays for Header Auto-Detection
+ITEM_CODE_SYNONYMS = ['item code', 'item_code', 'part number', 'part_number', 'part no', 'part_no', 'item', 'code', 'wago part no.', 'wago part no']
+CLOSING_STOCK_SYNONYMS = ['closing stock', 'current stock', 'stock', 'qty', 'quantity', 'balance', 'closing_stock']
+PURC_PENDING_SYNONYMS = ['purc. orders pending', 'purc orders pending', 'purc_orders_pending', 'purchase orders pending', 'po pending', 'pending purchase']
+SALE_DUE_SYNONYMS = ['sale orders due', 'sale_orders_due', 'sales orders due', 'so due', 'due sales']
+NETT_AVAILABLE_SYNONYMS = ['nett available', 'nett_available', 'net available', 'available stock']
+REORDER_LEVEL_SYNONYMS = ['reorder level', 'reorder_level', 'reorder qty', 'min level']
+SHORTFALL_SYNONYMS = ['short fall', 'shortfall', 'short_fall', 'shortage']
+MIN_REORDER_SYNONYMS = ['min. reorder qty', 'min reorder qty', 'min_reorder_qty', 'minimum reorder']
+ORDER_TO_PLACE_SYNONYMS = ['order to be placed', 'order_to_be_placed', 'order to place', 'suggested order']
+
+# Cost Price List Synonym Mapping Arrays
+PRICE_SYNONYMS = ['cat. price / 100 in rs.', 'cat. price / 100', 'price/100', 'price_100', 'price', 'rate', 'cost', 'list price', 'cat price']
+PACKING_QTY_SYNONYMS = ['std. pkg. / unit qty', 'std pkg', 'packing', 'packing_qty', 'pkg qty', 'unit qty']
+SERIES_SYNONYMS = ['series', 'category', 'group', 'item series']

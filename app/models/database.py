@@ -14,7 +14,7 @@ local_storage = threading.local()
 def init_db():
     """Initializes the database using schema.sql and seeds default customer data if empty."""
     db_logger.info(f"Initializing database at path: {Config.DATABASE_PATH}")
-    os.makedirs(Config.DATABASE_DIR, exist_ok=True)
+    os.makedirs(os.path.dirname(Config.DATABASE_PATH), exist_ok=True)
     os.makedirs(Config.UPLOADS_DIR, exist_ok=True)
     os.makedirs(Config.EXPORTS_DIR, exist_ok=True)
     
@@ -67,6 +67,7 @@ def init_db():
 
 def get_db_connection():
     """Gets a raw sqlite3 connection with standard settings."""
+    os.makedirs(os.path.dirname(Config.DATABASE_PATH), exist_ok=True)
     conn = sqlite3.connect(Config.DATABASE_PATH)
     conn.execute("PRAGMA foreign_keys = ON;")
     conn.row_factory = sqlite3.Row
