@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from config.settings import settings
-from api.routes import health, sync, stock
+from api.routes import health, sync, stock, ledgers
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -13,6 +13,7 @@ app = FastAPI(
 app.include_router(health.router)
 app.include_router(sync.router, prefix=settings.API_PREFIX)
 app.include_router(stock.router, prefix=settings.API_PREFIX)
+app.include_router(ledgers.router, prefix=settings.API_PREFIX)
 
 @app.get("/")
 def root():

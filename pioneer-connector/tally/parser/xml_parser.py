@@ -28,6 +28,23 @@ class TallyXMLParser:
                     if gst_elem is None:
                         gst_elem = elem.find("GSTIN")
 
+                    phone_elem = elem.find("LEDGERPHONE") or elem.find("PHONE") or elem.find("MOBILE")
+                    email_elem = elem.find("EMAIL")
+                    state_elem = elem.find("LEDGERSTATENAME") or elem.find("STATE")
+                    pin_elem = elem.find("PINCODE") or elem.find("PIN")
+
+                    # Address multi-line concatenation
+                    addr_lines = []
+                    addr_list = elem.find("ADDRESS.LIST")
+                    if addr_list is not None:
+                        for addr_line in addr_list.findall("ADDRESS"):
+                            if addr_line.text:
+                                addr_lines.append(addr_line.text.strip())
+                    elif elem.find("ADDRESS") is not None and elem.find("ADDRESS").text:
+                        addr_lines.append(elem.find("ADDRESS").text.strip())
+
+                    address_str = ", ".join(addr_lines) if addr_lines else None
+
                     closing_bal = 0.0
                     if bal_elem is not None and bal_elem.text:
                         try:
@@ -36,15 +53,40 @@ class TallyXMLParser:
                         except ValueError:
                             closing_bal = 0.0
 
+                    parent_grp = parent_elem.text.strip() if parent_elem is not None and parent_elem.text else "Primary"
+                    ledger_type = cls._categorize_ledger_group(parent_grp)
+
                     ledgers.append(TallyLedger(
                         guid=guid_elem.text.strip() if guid_elem is not None and guid_elem.text else None,
                         name=name_elem.text.strip(),
-                        parent_group=parent_elem.text.strip() if parent_elem is not None and parent_elem.text else "Primary",
+                        parent_group=parent_grp,
+                        ledger_type=ledger_type,
                         closing_balance=closing_bal,
-                        gstin=gst_elem.text.strip() if gst_elem is not None and gst_elem.text else None
+                        gstin=gst_elem.text.strip() if gst_elem is not None and gst_elem.text else None,
+                        address=address_str,
+                        phone=phone_elem.text.strip() if phone_elem is not None and phone_elem.text else None,
+                        email=email_elem.text.strip() if email_elem is not None and email_elem.text else None,
+                        state=state_elem.text.strip() if state_elem is not None and state_elem.text else None,
+                        pin_code=pin_elem.text.strip() if pin_elem is not None and pin_elem.text else None
                     ))
 
         return ledgers
+
+    @staticmethod
+    def _categorize_ledger_group(parent_group: str) -> str:
+        """Categorizes Tally parent group into canonical ledger type."""
+        grp_lower = parent_group.lower()
+        if "debtor" in grp_lower or "customer" in grp_lower:
+            return "customer"
+        elif "creditor" in grp_lower or "supplier" in grp_lower or "vendor" in grp_lower:
+            return "supplier"
+        elif "expense" in grp_lower:
+            return "expense"
+        elif "income" in grp_lower or "sales" in grp_lower:
+            return "income"
+        elif "duti" in grp_lower or "tax" in grp_lower or "gst" in grp_lower:
+            return "tax"
+        return "general"
 
     @classmethod
     def parse_stock_groups(cls, xml_content: str) -> List[TallyStockGroup]:
