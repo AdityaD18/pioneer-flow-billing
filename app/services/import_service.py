@@ -3,7 +3,8 @@ import re
 import pandas as pd
 import sqlite3
 from datetime import datetime
-from app.models.database import get_db_connection, execute_db, query_db
+from app.repositories.base_repository import BaseRepository
+from app.repositories.import_log_repository import ImportLogRepository
 from app.services.excel_header_detector import ExcelHeaderDetector
 from app.core.config import Config
 from app.core.logger import import_logger
@@ -95,7 +96,7 @@ class ImportService:
         failed_records = 0
         errors = []
         
-        conn = get_db_connection()
+        conn = BaseRepository.get_connection()
         conn.isolation_level = None
         cur = conn.cursor()
         cur.execute("BEGIN TRANSACTION;")
@@ -202,11 +203,7 @@ class ImportService:
         if failed_records > 0:
             status = 'partial_success' if successful_records > 0 else 'failed'
             
-        execute_db(
-            "INSERT INTO IMPORT_LOG (import_type, filename, total_records, successful_records, failed_records, imported_by, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            ('inventory', filename, total_records, successful_records, failed_records, imported_by, status)
-        )
-        
+        ImportLogRepository.log_import('inventory', filename, total_records, successful_records, failed_records, imported_by, status)
         import_logger.info(f"Inventory import finished ({status}): {successful_records}/{total_records} successful, {failed_records} failed.")
         return {
             "status": status,
@@ -318,7 +315,7 @@ class ImportService:
         failed_records = 0
         errors = []
         
-        conn = get_db_connection()
+        conn = BaseRepository.get_connection()
         conn.isolation_level = None
         cur = conn.cursor()
         cur.execute("BEGIN TRANSACTION;")
@@ -415,11 +412,7 @@ class ImportService:
         if failed_records > 0:
             status = 'partial_success' if successful_records > 0 else 'failed'
             
-        execute_db(
-            "INSERT INTO IMPORT_LOG (import_type, filename, total_records, successful_records, failed_records, imported_by, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            ('cost', filename, total_records, successful_records, failed_records, imported_by, status)
-        )
-        
+        ImportLogRepository.log_import('cost', filename, total_records, successful_records, failed_records, imported_by, status)
         import_logger.info(f"Cost list import finished ({status}): {successful_records}/{total_records} successful, {failed_records} failed.")
         return {
             "status": status,

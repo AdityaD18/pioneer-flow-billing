@@ -1,6 +1,7 @@
-import sqlite3
 from datetime import datetime
-from app.models.database import get_db, query_db, execute_db
+from app.repositories.invoice_repository import InvoiceRepository
+from app.repositories.order_repository import OrderRepository
+from app.repositories.base_repository import BaseRepository
 from app.core.constants import INVOICE_SEQ_PREFIX, DEFAULT_START_SEQ
 from app.core.logger import billing_logger
 
@@ -12,18 +13,16 @@ class InvoiceService:
         Uses SQLite IMMEDIATE transaction sequencing to prevent duplicates in concurrent environments.
         """
         billing_logger.info(f"Generating invoice for order_id: {order_id}")
-        conn = get_db()
-        cur = conn.cursor()
         
         # Verify order exists
-        order = query_db("SELECT id FROM ORDERS WHERE id = ?", (order_id,), one=True)
+        order = OrderRepository.get_by_id(order_id)
         if not order:
             err_msg = f"Order ID {order_id} not found."
             billing_logger.error(err_msg)
             raise ValueError(err_msg)
             
         # Verify invoice doesn't already exist for this order
-        existing = query_db("SELECT id, invoice_number FROM INVOICES WHERE order_id = ?", (order_id,), one=True)
+        existing = InvoiceRepository.get_by_order_id(order_id)
         if existing:
             billing_logger.info(f"Invoice already exists for order_id {order_id}: {existing['invoice_number']}")
             return existing['id']
@@ -32,6 +31,9 @@ class InvoiceService:
             invoice_date = datetime.now().strftime('%Y-%m-%d')
             
         current_year = str(datetime.now().year)
+        
+        conn = BaseRepository.get_connection()
+        cur = conn.cursor()
         
         try:
             # Wrap in write lock transaction
@@ -77,40 +79,9 @@ class InvoiceService:
     @staticmethod
     def get_invoices(search_query=None):
         """Retrieves past invoices, optionally filtering by invoice number or customer name."""
-        if search_query:
-            q = f"%{search_query}%"
-            rows = query_db(
-                """SELECT i.*, o.customer_name_snapshot, o.grand_total, o.order_number 
-                   FROM INVOICES i
-                   JOIN ORDERS o ON i.order_id = o.id
-                   WHERE i.invoice_number LIKE ? OR o.customer_name_snapshot LIKE ?
-                   ORDER BY i.created_at DESC""",
-                (q, q)
-            )
-        else:
-            rows = query_db(
-                """SELECT i.*, o.customer_name_snapshot, o.grand_total, o.order_number 
-                   FROM INVOICES i
-                   JOIN ORDERS o ON i.order_id = o.id
-                   ORDER BY i.created_at DESC"""
-            )
-        return [dict(r) for r in rows]
+        return InvoiceRepository.get_all(search_query=search_query)
 
     @classmethod
     def get_invoice_by_id(cls, invoice_id):
         """Retrieves complete details for a specific invoice, including items and order snapshot."""
-        inv = query_db("SELECT * FROM INVOICES WHERE id = ?", (invoice_id,), one=True)
-        if not inv:
-            return None
-            
-        order_id = inv['order_id']
-        order_details = query_db("SELECT * FROM ORDERS WHERE id = ?", (order_id,), one=True)
-        if not order_details:
-            return None
-            
-        items = query_db("SELECT * FROM ORDER_ITEMS WHERE order_id = ?", (order_id,))
-        
-        result = dict(inv)
-        result['order'] = dict(order_details)
-        result['items'] = [dict(item) for item in items]
-        return result
+        return InvoiceRepository.get_by_id(invoice_id)

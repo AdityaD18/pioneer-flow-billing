@@ -1,6 +1,6 @@
-import sqlite3
 from datetime import datetime
-from app.models.database import get_db, query_db, get_db_connection
+from app.repositories.quotation_repository import QuotationRepository
+from app.repositories.base_repository import BaseRepository
 from app.services.customer_service import CustomerService
 from app.services.order_service import OrderService
 from app.core.constants import QUOTATION_SEQ_PREFIX, DEFAULT_START_SEQ
@@ -14,8 +14,6 @@ class QuotationService:
         Uses SQLite IMMEDIATE transaction sequencing to prevent duplicates.
         """
         billing_logger.info(f"Generating quotation for customer: {customer_input.get('name')}")
-        conn = get_db()
-        cur = conn.cursor()
         
         # 1. Resolve customer
         customer_id = customer_input.get('id')
@@ -53,6 +51,9 @@ class QuotationService:
             quotation_date = datetime.now().strftime('%Y-%m-%d')
             
         current_year = str(datetime.now().year)
+        
+        conn = BaseRepository.get_connection()
+        cur = conn.cursor()
         
         try:
             # Wrap in write lock transaction
@@ -123,43 +124,9 @@ class QuotationService:
     @staticmethod
     def get_quotations(search_query=None):
         """Retrieves past quotations, optionally filtering by quotation number or customer name."""
-        if search_query:
-            q = f"%{search_query}%"
-            rows = query_db(
-                """SELECT q.* 
-                   FROM QUOTATIONS q
-                   WHERE q.quotation_number LIKE ? OR q.customer_name_snapshot LIKE ?
-                   ORDER BY q.created_at DESC""",
-                (q, q)
-            )
-        else:
-            rows = query_db(
-                """SELECT q.* 
-                   FROM QUOTATIONS q
-                   ORDER BY q.created_at DESC"""
-            )
-        return [dict(r) for r in rows]
+        return QuotationRepository.get_all(search_query=search_query)
 
     @classmethod
     def get_quotation_by_id(cls, quotation_id):
         """Retrieves complete details for a specific quotation, including items."""
-        q = query_db("SELECT * FROM QUOTATIONS WHERE id = ?", (quotation_id,), one=True)
-        if not q:
-            return None
-            
-        items = query_db("SELECT * FROM QUOTATION_ITEMS WHERE quotation_id = ?", (quotation_id,))
-        
-        result = dict(q)
-        result['order'] = {
-            "order_number": q['quotation_number'],
-            "customer_name_snapshot": q['customer_name_snapshot'],
-            "customer_gst_snapshot": q['customer_gst_snapshot'],
-            "customer_terms_snapshot": q['customer_terms_snapshot'],
-            "discount_percentage": q['discount_percentage'],
-            "subtotal": q['subtotal'],
-            "gst_amount": q['gst_amount'],
-            "gst_rate": q['gst_rate'],
-            "grand_total": q['grand_total']
-        }
-        result['items'] = [dict(item) for item in items]
-        return result
+        return QuotationRepository.get_by_id(quotation_id)
