@@ -5,6 +5,7 @@ import sqlite3
 from datetime import datetime
 from app.repositories.base_repository import BaseRepository
 from app.repositories.import_log_repository import ImportLogRepository
+from app.services.inventory_service import InventoryService
 from app.services.excel_header_detector import ExcelHeaderDetector
 from app.core.config import Config
 from app.core.logger import import_logger
@@ -115,30 +116,20 @@ class ImportService:
                 stock_val = parse_float_or_none(row, stock_col) or 0.0
                 purc_val = parse_float_or_none(row, purc_col) or 0.0
                 sales_val = parse_float_or_none(row, sales_col) or 0.0
-                
                 nett_raw = parse_float_or_none(row, nett_col)
-                if nett_raw is not None:
-                    nett_val = nett_raw
-                else:
-                    nett_val = stock_val + purc_val - sales_val
-                    
-                reorder_raw = parse_float_or_none(row, reorder_col)
-                reorder_val = reorder_raw if reorder_raw is not None else 0.0
-                
+                reorder_val = parse_float_or_none(row, reorder_col) or 0.0
                 shortfall_raw = parse_float_or_none(row, shortfall_col)
-                if shortfall_raw is not None:
-                    shortfall_val = shortfall_raw
-                else:
-                    shortfall_val = max(0.0, reorder_val - nett_val)
-                    
-                min_reorder_raw = parse_float_or_none(row, min_reorder_col)
-                min_reorder_val = min_reorder_raw if min_reorder_raw is not None else 0.0
-                
+                min_reorder_val = parse_float_or_none(row, min_reorder_col) or 0.0
                 order_to_place_raw = parse_float_or_none(row, order_to_place_col)
-                if order_to_place_raw is not None:
-                    order_to_place_val = order_to_place_raw
-                else:
-                    order_to_place_val = max(shortfall_val, min_reorder_val) if shortfall_val > 0 else 0.0
+                
+                # Delegate calculation to InventoryService
+                metrics = InventoryService.calculate_reorder_metrics(
+                    stock_val, purc_val, sales_val, reorder_val, min_reorder_val,
+                    nett_raw, shortfall_raw, order_to_place_raw
+                )
+                nett_val = metrics['nett_available']
+                shortfall_val = metrics['shortfall']
+                order_to_place_val = metrics['order_to_place']
                 
                 # 1. Check if product exists
                 cur.execute("SELECT id FROM PRODUCTS WHERE part_number = ?", (item_code,))
