@@ -1435,3 +1435,50 @@ ValueError: Excel file format cannot be determined, you must specify an engine m
 2026-08-03 15:33:58 | INFO     | [pioneer_billing.billing] | Successfully generated quotation 'QTN-2026-01001' (ID: 1) for customer 'Quotation Client'.
 2026-08-03 15:33:58 | INFO     | [pioneer_billing.import] | Starting inventory import from file 'uploaded_file.xlsx', sheet 'Stock Group Reorder Status'.
 2026-08-03 15:33:58 | INFO     | [pioneer_billing.import] | Inventory import finished (success): 1408/1408 successful, 0 failed.
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.database] | Initializing database at path: A:\Project1\instance\db\database.db
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.database] | Seeded initial default Demo1 customer profile.
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.database] | Database initialization completed successfully.
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.import] | Starting inventory import from file 'uploaded_file.xlsx', sheet 'Stock Group Reorder Status'.
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.import] | Inventory import finished (success): 1408/1408 successful, 0 failed.
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.import] | Starting cost list import from file 'uploaded_file.xlsx', sheet 'PRICE LIST'.
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.import] | Cost list import finished (success): 3319/3319 successful, 0 failed.
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Created customer 'Pioneer Automation Corp' (ID: 2, Discount: 12.5%).
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Updated customer 'Pioneer Automation Corp Updated' (ID: 2).
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Created customer 'Quicktest Client' (ID: 3, Discount: 10.0%).
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 1
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01001' (ID: 1) for order_id 1.
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Created customer 'Concurrent Customer 0' (ID: 4, Discount: 5.0%).
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Created customer 'Concurrent Customer 5' (ID: 5, Discount: 5.0%).
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Created customer 'Concurrent Customer 8' (ID: 6, Discount: 5.0%).
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Created customer 'Concurrent Customer 9' (ID: 7, Discount: 5.0%).
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Created customer 'Concurrent Customer 1' (ID: 8, Discount: 5.0%).
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Created customer 'Concurrent Customer 7' (ID: 9, Discount: 5.0%).
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 2
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 3
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01002' (ID: 2) for order_id 3.
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 4
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Created customer 'Concurrent Customer 6' (ID: 10, Discount: 5.0%).
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01003' (ID: 3) for order_id 2.
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01004' (ID: 4) for order_id 4.
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 5
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01005' (ID: 5) for order_id 5.
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 6
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01006' (ID: 6) for order_id 6.
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 7
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01007' (ID: 7) for order_id 7.
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 8
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01008' (ID: 8) for order_id 8.
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Created customer 'Concurrent Customer 2' (ID: 11, Discount: 5.0%).
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Created customer 'Concurrent Customer 4' (ID: 12, Discount: 5.0%).
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 9
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 10
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01009' (ID: 9) for order_id 9.
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01010' (ID: 10) for order_id 10.
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Created customer 'Concurrent Customer 3' (ID: 13, Discount: 5.0%).
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 11
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01011' (ID: 11) for order_id 11.
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Generating quotation for customer: Quotation Client
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Created customer 'Quotation Client' (ID: 14, Discount: 5.0%).
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.billing] | Successfully generated quotation 'QTN-2026-01001' (ID: 1) for customer 'Quotation Client'.
+2026-08-03 15:34:45 | INFO     | [pioneer_billing.import] | Starting inventory import from file 'uploaded_file.xlsx', sheet 'Stock Group Reorder Status'.
+2026-08-03 15:34:46 | INFO     | [pioneer_billing.import] | Inventory import finished (success): 1408/1408 successful, 0 failed.

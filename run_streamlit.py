@@ -17,6 +17,7 @@ st.set_page_config(
 # Initialize Database & CSS Styles
 from app.models.database import init_db
 from app.ui.styles import inject_custom_css, render_html
+from app.ui.connection_status import render_connection_status
 from app.ui.views.catalog import render_catalog_tab
 from app.ui.views.stock_status import render_stock_status_tab
 from app.ui.views.billing import render_billing_tab
@@ -41,6 +42,9 @@ render_html(f"""
     </div>
 </div>
 """)
+
+# Render Connector & Provider Connection Health Status Indicator
+render_connection_status()
 
 # Render Navigation Sidebar Tabs
 t_catalog, t_stock, t_billing, t_history, t_customers, t_settings = st.tabs([
