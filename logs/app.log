@@ -481,3 +481,141 @@ FileNotFoundError: [Errno 2] No such file or directory: 'A:\\Project1\\app\\mode
 2026-08-03 15:14:45 | INFO     | [pioneer_billing.billing] | Successfully generated quotation 'QTN-2026-01001' (ID: 1) for customer 'Quotation Client'.
 2026-08-03 15:14:45 | INFO     | [pioneer_billing.import] | Starting inventory import from file 'uploaded_file.xlsx', sheet 'Stock Group Reorder Status'.
 2026-08-03 15:14:45 | INFO     | [pioneer_billing.import] | Inventory import finished (success): 1408/1408 successful, 0 failed.
+2026-08-03 15:15:18 | INFO     | [pioneer_billing.database] | Initializing database at path: A:\Project1\instance\db\database.db
+2026-08-03 15:15:18 | INFO     | [pioneer_billing.database] | Database initialization completed successfully.
+2026-08-03 15:15:18 | INFO     | [pioneer_billing.app] | Instantiated singleton Data Provider 'excel' (ExcelDataProvider).
+2026-08-03 15:15:18 | INFO     | [pioneer_billing.billing] | Created customer 'Provider Test Client' (ID: 15, Discount: 5.0%).
+2026-08-03 15:15:18 | INFO     | [pioneer_billing.billing] | Created customer 'Provider Invoice Client' (ID: 16, Discount: 10.0%).
+2026-08-03 15:15:18 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 12
+2026-08-03 15:15:18 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01012' (ID: 12) for order_id 12.
+2026-08-03 15:15:18 | INFO     | [pioneer_billing.import] | Starting inventory import from file 'uploaded_file.xlsx', sheet 'Stock Group Reorder Status'.
+2026-08-03 15:15:18 | WARNING  | [pioneer_billing.import] | Header detection failed on sheet 'Stock Group Reorder Status': [Errno 2] No such file or directory: 'non_existent_file_path_999.xlsx'. Attempting matching sheet search...
+2026-08-03 15:15:18 | ERROR    | [pioneer_billing.import] | Header detection failed for stock sheet: [Errno 2] No such file or directory: 'non_existent_file_path_999.xlsx'
+Traceback (most recent call last):
+  File "A:\Project1\app\services\import_service.py", line 32, in import_inventory
+    df = cls.detect_headers_and_df(file_path, sheet_name, item_groups)
+  File "A:\Project1\app\services\import_service.py", line 24, in detect_headers_and_df
+    return ExcelHeaderDetector.detect_headers_and_df(file_path, sheet_name, mandatory_synonym_groups)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "A:\Project1\app\services\excel_header_detector.py", line 11, in detect_headers_and_df
+    df_raw = pd.read_excel(file_path, sheet_name=sheet_name, header=None, nrows=30)
+  File "C:\Users\Admin\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\pandas\io\excel\_base.py", line 495, in read_excel
+    io = ExcelFile(
+        io,
+    ...<2 lines>...
+        engine_kwargs=engine_kwargs,
+    )
+  File "C:\Users\Admin\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\pandas\io\excel\_base.py", line 1550, in __init__
+    ext = inspect_excel_format(
+        content_or_path=path_or_buffer, storage_options=storage_options
+    )
+  File "C:\Users\Admin\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\pandas\io\excel\_base.py", line 1402, in inspect_excel_format
+    with get_handle(
+         ~~~~~~~~~~^
+        content_or_path, "rb", storage_options=storage_options, is_text=False
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ) as handle:
+    ^
+  File "C:\Users\Admin\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\pandas\io\common.py", line 882, in get_handle
+    handle = open(handle, ioargs.mode)
+FileNotFoundError: [Errno 2] No such file or directory: 'non_existent_file_path_999.xlsx'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "A:\Project1\app\services\import_service.py", line 38, in import_inventory
+    xls = pd.ExcelFile(file_path)
+  File "C:\Users\Admin\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\pandas\io\excel\_base.py", line 1550, in __init__
+    ext = inspect_excel_format(
+        content_or_path=path_or_buffer, storage_options=storage_options
+    )
+  File "C:\Users\Admin\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\pandas\io\excel\_base.py", line 1402, in inspect_excel_format
+    with get_handle(
+         ~~~~~~~~~~^
+        content_or_path, "rb", storage_options=storage_options, is_text=False
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ) as handle:
+    ^
+  File "C:\Users\Admin\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\pandas\io\common.py", line 882, in get_handle
+    handle = open(handle, ioargs.mode)
+FileNotFoundError: [Errno 2] No such file or directory: 'non_existent_file_path_999.xlsx'
+2026-08-03 15:15:18 | INFO     | [pioneer_billing.import] | Starting inventory import from file 'corrupt.xlsx', sheet 'Stock Group Reorder Status'.
+2026-08-03 15:15:18 | WARNING  | [pioneer_billing.import] | Header detection failed on sheet 'Stock Group Reorder Status': Excel file format cannot be determined, you must specify an engine manually.. Attempting matching sheet search...
+2026-08-03 15:15:18 | ERROR    | [pioneer_billing.import] | Header detection failed for stock sheet: Excel file format cannot be determined, you must specify an engine manually.
+Traceback (most recent call last):
+  File "A:\Project1\app\services\import_service.py", line 32, in import_inventory
+    df = cls.detect_headers_and_df(file_path, sheet_name, item_groups)
+  File "A:\Project1\app\services\import_service.py", line 24, in detect_headers_and_df
+    return ExcelHeaderDetector.detect_headers_and_df(file_path, sheet_name, mandatory_synonym_groups)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "A:\Project1\app\services\excel_header_detector.py", line 11, in detect_headers_and_df
+    df_raw = pd.read_excel(file_path, sheet_name=sheet_name, header=None, nrows=30)
+  File "C:\Users\Admin\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\pandas\io\excel\_base.py", line 495, in read_excel
+    io = ExcelFile(
+        io,
+    ...<2 lines>...
+        engine_kwargs=engine_kwargs,
+    )
+  File "C:\Users\Admin\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\pandas\io\excel\_base.py", line 1554, in __init__
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: Excel file format cannot be determined, you must specify an engine manually.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "A:\Project1\app\services\import_service.py", line 38, in import_inventory
+    xls = pd.ExcelFile(file_path)
+  File "C:\Users\Admin\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\pandas\io\excel\_base.py", line 1554, in __init__
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: Excel file format cannot be determined, you must specify an engine manually.
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.database] | Initializing database at path: A:\Project1\instance\db\database.db
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.database] | Seeded initial default Demo1 customer profile.
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.database] | Database initialization completed successfully.
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.import] | Starting inventory import from file 'uploaded_file.xlsx', sheet 'Stock Group Reorder Status'.
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.import] | Inventory import finished (success): 1408/1408 successful, 0 failed.
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.import] | Starting cost list import from file 'uploaded_file.xlsx', sheet 'PRICE LIST'.
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.import] | Cost list import finished (success): 3319/3319 successful, 0 failed.
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Created customer 'Pioneer Automation Corp' (ID: 2, Discount: 12.5%).
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Updated customer 'Pioneer Automation Corp Updated' (ID: 2).
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Created customer 'Quicktest Client' (ID: 3, Discount: 10.0%).
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 1
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01001' (ID: 1) for order_id 1.
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Created customer 'Concurrent Customer 0' (ID: 4, Discount: 5.0%).
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Created customer 'Concurrent Customer 2' (ID: 5, Discount: 5.0%).
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Created customer 'Concurrent Customer 4' (ID: 6, Discount: 5.0%).
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 2
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 3
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Created customer 'Concurrent Customer 5' (ID: 7, Discount: 5.0%).
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Created customer 'Concurrent Customer 1' (ID: 8, Discount: 5.0%).
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01002' (ID: 2) for order_id 3.
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 4
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 5
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01003' (ID: 3) for order_id 4.
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Created customer 'Concurrent Customer 7' (ID: 9, Discount: 5.0%).
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 6
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01004' (ID: 4) for order_id 6.
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 7
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01005' (ID: 5) for order_id 5.
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01006' (ID: 6) for order_id 7.
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Created customer 'Concurrent Customer 8' (ID: 10, Discount: 5.0%).
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Created customer 'Concurrent Customer 3' (ID: 11, Discount: 5.0%).
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 8
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01007' (ID: 7) for order_id 8.
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 9
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01008' (ID: 8) for order_id 9.
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Created customer 'Concurrent Customer 9' (ID: 12, Discount: 5.0%).
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01009' (ID: 9) for order_id 2.
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 10
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01010' (ID: 10) for order_id 10.
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Created customer 'Concurrent Customer 6' (ID: 13, Discount: 5.0%).
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Generating invoice for order_id: 11
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Successfully generated invoice 'INV-2026-01011' (ID: 11) for order_id 11.
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Generating quotation for customer: Quotation Client
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Created customer 'Quotation Client' (ID: 14, Discount: 5.0%).
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.billing] | Successfully generated quotation 'QTN-2026-01001' (ID: 1) for customer 'Quotation Client'.
+2026-08-03 15:15:22 | INFO     | [pioneer_billing.import] | Starting inventory import from file 'uploaded_file.xlsx', sheet 'Stock Group Reorder Status'.
+2026-08-03 15:15:23 | INFO     | [pioneer_billing.import] | Inventory import finished (success): 1408/1408 successful, 0 failed.
